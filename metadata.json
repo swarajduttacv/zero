@@ -1,0 +1,5 @@
+{
+  "name": "ZeroGPT Portfolio Intelligence",
+  "description": "An intelligent financial assistant that connects to your portfolio to provide real-time insights, strategy, and visualizations using Gemini 2.5.",
+  "requestFramePermissions": []
+}
