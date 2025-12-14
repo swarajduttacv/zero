@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -6,6 +7,11 @@
     <title>ZeroGPT Portfolio</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
+      // POLYFILL: Ensure 'process' exists for libraries that expect it (like Gemini SDK or env var access)
+      if (typeof process === 'undefined') {
+        window.process = { env: {} };
+      }
+      
       tailwind.config = {
         theme: {
           extend: {
@@ -39,6 +45,15 @@
           -ms-overflow-style: none;
           scrollbar-width: none;
       }
+      
+      /* Loading Pulse */
+      .loader-pulse {
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: .5; }
+      }
     </style>
   <script type="importmap">
 {
@@ -55,6 +70,15 @@
 </script>
 </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+        <!-- Initial Loading State (Visible before React Mounts) -->
+        <div style="height: 100vh; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; font-family: sans-serif; background-color: #0f172a; color: white;">
+            <div style="width: 48px; height: 48px; border: 4px solid #3b82f6; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+            <h2 class="loader-pulse" style="font-size: 1.25rem; font-weight: 600;">Initializing ZeroGPT...</h2>
+            <style>
+                @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+            </style>
+        </div>
+    </div>
   </body>
 </html>

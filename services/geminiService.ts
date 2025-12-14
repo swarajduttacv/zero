@@ -1,20 +1,38 @@
 
-import { GoogleGenAI, Type, Schema, FunctionDeclaration } from "@google/genai";
-import { PortfolioSummary, AIMessageResponse, TradeOrder } from '../types';
+import { GoogleGenAI, Type, FunctionDeclaration } from "@google/genai";
+import { PortfolioSummary, AIMessageResponse } from '../types';
 
-// Lazy initialization of the AI client to prevent crashes if process.env is accessed too early
+// Lazy initialization
 let aiClient: GoogleGenAI | null = null;
 
 const getAIClient = () => {
     if (!aiClient) {
-        // Fallback or check for key existence
-        const key = process.env.API_KEY;
-        if (!key) {
-            console.error("API_KEY is missing from environment variables");
-            throw new Error("System Configuration Error: API_KEY is missing.");
+        let key = '';
+        
+        // Defensive check for process.env
+        try {
+            // @ts-ignore
+            if (typeof process !== 'undefined' && process.env) {
+                key = process.env.API_KEY || '';
+            }
+        } catch (e) {
+            console.warn("Could not read process.env:", e);
         }
-        aiClient = new GoogleGenAI({ apiKey: key });
+
+        if (!key) {
+            console.error("API_KEY is missing. Ensure it is set in your environment variables.");
+            // We do not throw here to prevent app crash on load. We throw only when usage is attempted.
+        }
+        
+        if (key) {
+            aiClient = new GoogleGenAI({ apiKey: key });
+        }
     }
+    
+    if (!aiClient) {
+        throw new Error("API Key is missing. Please verify your deployment environment variables (API_KEY).");
+    }
+    
     return aiClient;
 };
 
