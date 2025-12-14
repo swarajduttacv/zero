@@ -1,7 +1,22 @@
-import { GoogleGenAI, Type, Schema, FunctionDeclaration, Tool } from "@google/genai";
+
+import { GoogleGenAI, Type, Schema, FunctionDeclaration } from "@google/genai";
 import { PortfolioSummary, AIMessageResponse, TradeOrder } from '../types';
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Lazy initialization of the AI client to prevent crashes if process.env is accessed too early
+let aiClient: GoogleGenAI | null = null;
+
+const getAIClient = () => {
+    if (!aiClient) {
+        // Fallback or check for key existence
+        const key = process.env.API_KEY;
+        if (!key) {
+            console.error("API_KEY is missing from environment variables");
+            throw new Error("System Configuration Error: API_KEY is missing.");
+        }
+        aiClient = new GoogleGenAI({ apiKey: key });
+    }
+    return aiClient;
+};
 
 // Define the tool for trading
 const proposeTradeTool: FunctionDeclaration = {
@@ -37,32 +52,6 @@ const proposeTradeTool: FunctionDeclaration = {
   },
 };
 
-const RESPONSE_SCHEMA: Schema = {
-  type: Type.OBJECT,
-  properties: {
-    analysis: {
-      type: Type.STRING,
-      description: "The textual answer. If a tool was used, describe what action is being proposed.",
-    },
-    visuals: {
-      type: Type.OBJECT,
-      description: "Optional visuals.",
-      properties: {
-        type: { type: Type.STRING, enum: ["bar", "pie", "line", "none"] },
-        title: { type: Type.STRING },
-        data: {
-          type: Type.ARRAY,
-          items: {
-             type: Type.OBJECT,
-             properties: { label: { type: Type.STRING }, value: { type: Type.NUMBER } }
-          }
-        },
-      },
-    },
-  },
-  required: ["analysis"],
-};
-
 export const analyzePortfolio = async (
   portfolio: PortfolioSummary, 
   userMessage: string
@@ -88,16 +77,13 @@ export const analyzePortfolio = async (
   `;
 
   try {
+    const ai = getAIClient();
     const response = await ai.models.generateContent({
       model: modelId,
       contents: userMessage,
       config: {
         systemInstruction: systemInstruction,
         tools: [{ functionDeclarations: [proposeTradeTool] }],
-        // responseSchema: RESPONSE_SCHEMA, // Note: responseSchema behaves strictly with tools in some versions, so we might handle JSON parsing manually if tool is called.
-        // Actually, with the new SDK, mixing tools and responseSchema can be tricky. 
-        // Strategy: If tool is called, the SDK returns functionCalls. If not, it follows schema or text.
-        // We will NOT set responseSchema here to allow the model to choose between Tool Call OR JSON text.
         temperature: 0.2, 
       }
     });
@@ -121,16 +107,10 @@ export const analyzePortfolio = async (
       }
     }
 
-    // If no tool call, we expect text. Since we removed responseSchema to allow tool flexibility,
-    // we need to parse the text if the model outputs JSON, or just return the text.
-    // However, to maintain the "visuals" feature, we should instruct the model to output JSON if it's just text.
-    // Let's do a second pass if needed, or better, use a simpler heuristic.
-    
-    // For this implementation, let's just parse the text if it looks like JSON, else wrap it.
     const text = response.text || "";
     let parsed;
     try {
-        // Try to find JSON block
+        // Try to find JSON block if model outputs it
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
             parsed = JSON.parse(jsonMatch[0]);
@@ -143,10 +123,10 @@ export const analyzePortfolio = async (
 
     return parsed as AIMessageResponse;
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini API Error:", error);
     return {
-      analysis: "I'm having trouble connecting to the intelligence engine right now. Please check your network.",
+      analysis: `I encountered an issue processing your request: ${error.message || 'Connection Error'}. Please check your API configuration.`,
       visuals: { type: 'none', title: '', data: [] }
     };
   }

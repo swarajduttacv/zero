@@ -1,22 +1,29 @@
 
-import { User, UserSettings, ChatMessage } from '../types';
+import { User, UserSettings } from '../types';
 
 const USERS_KEY = 'zerogpt_users';
 const CURRENT_USER_KEY = 'zerogpt_current_user_id';
 
 const DEFAULT_SETTINGS: UserSettings = {
-  apiKey: '', // User must fill this in Settings
+  apiKey: '', 
   apiSecret: '',
-  accessToken: 'DBBvkRbYPM11MkvMg3jL2HD6Ns2Mc3ha', // Pre-filled as requested
+  accessToken: 'DBBvkRbYPM11MkvMg3jL2HD6Ns2Mc3ha', 
   passcode: '0000',
   isLiveMode: false,
-  useProxy: true // Default to using proxy
+  useProxy: true
 };
 
 export const AuthService = {
   getUsers(): User[] {
-    const usersStr = localStorage.getItem(USERS_KEY);
-    return usersStr ? JSON.parse(usersStr) : [];
+    try {
+        const usersStr = localStorage.getItem(USERS_KEY);
+        if (!usersStr) return [];
+        const users = JSON.parse(usersStr);
+        return Array.isArray(users) ? users : [];
+    } catch (e) {
+        console.error("Corrupted user data in localStorage", e);
+        return [];
+    }
   },
 
   saveUsers(users: User[]) {
@@ -24,23 +31,45 @@ export const AuthService = {
   },
 
   getCurrentUser(): User | null {
-    const userId = localStorage.getItem(CURRENT_USER_KEY);
-    if (!userId) return null;
-    const users = this.getUsers();
-    const user = users.find(u => u.id === userId);
-    
-    // Revive dates in chat history
-    if (user && user.chatHistory) {
-        user.chatHistory = user.chatHistory.map(msg => ({
-            ...msg,
-            timestamp: new Date(msg.timestamp)
-        }));
+    try {
+        const userId = localStorage.getItem(CURRENT_USER_KEY);
+        if (!userId) return null;
+        
+        const users = this.getUsers();
+        const user = users.find(u => u.id === userId);
+        
+        if (!user) {
+            // ID exists but user doesn't - cleanup
+            this.logout();
+            return null;
+        }
+        
+        // Data Migration & Safety Checks
+        
+        // 1. Revive dates
+        if (user.chatHistory && Array.isArray(user.chatHistory)) {
+            user.chatHistory = user.chatHistory.map(msg => ({
+                ...msg,
+                timestamp: new Date(msg.timestamp)
+            }));
+        } else {
+            user.chatHistory = [];
+        }
+
+        // 2. Merge Settings
+        if (!user.settings) {
+            user.settings = { ...DEFAULT_SETTINGS };
+        } else {
+            // Ensure all default fields exist in user settings
+            user.settings = { ...DEFAULT_SETTINGS, ...user.settings };
+        }
+
+        return user;
+    } catch (e) {
+        console.error("Error retrieving current user", e);
+        this.logout();
+        return null;
     }
-    // Ensure settings has new fields if loaded from old localstorage
-    if (user && user.settings && typeof user.settings.useProxy === 'undefined') {
-        user.settings.useProxy = true;
-    }
-    return user || null;
   },
 
   login(email: string, password: string): User | null {
@@ -48,7 +77,7 @@ export const AuthService = {
     const user = users.find(u => u.email === email && u.password === password);
     if (user) {
       localStorage.setItem(CURRENT_USER_KEY, user.id);
-      return user;
+      return this.getCurrentUser(); // Return sanitized user
     }
     return null;
   },
@@ -64,7 +93,7 @@ export const AuthService = {
       name,
       email,
       password,
-      settings: DEFAULT_SETTINGS,
+      settings: { ...DEFAULT_SETTINGS },
       chatHistory: []
     };
 

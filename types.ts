@@ -23,6 +23,7 @@ export interface PortfolioSummary {
 export interface ChartDataPoint {
   label: string;
   value: number;
+  [key: string]: any;
 }
 
 export interface AIResponseVisuals {
