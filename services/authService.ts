@@ -4,13 +4,15 @@ import { User, UserSettings } from '../types';
 const USERS_KEY = 'zerogpt_users';
 const CURRENT_USER_KEY = 'zerogpt_current_user_id';
 
+// Fixed missing backendUrl required by UserSettings interface
 const DEFAULT_SETTINGS: UserSettings = {
   apiKey: '', 
   apiSecret: '',
   accessToken: 'DBBvkRbYPM11MkvMg3jL2HD6Ns2Mc3ha', 
   passcode: '0000',
   isLiveMode: false,
-  useProxy: true
+  useProxy: true,
+  backendUrl: ''
 };
 
 export const AuthService = {

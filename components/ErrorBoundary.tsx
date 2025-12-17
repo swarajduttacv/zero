@@ -1,4 +1,5 @@
-import React, { ErrorInfo, ReactNode } from 'react';
+
+import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 interface Props {
@@ -12,10 +13,10 @@ interface State {
 
 /**
  * Global error boundary to catch and handle UI crashes gracefully.
- * Fixed inheritance issues by using React.Component explicitly and moving state to a class field.
+ * Fixed inheritance issues by using Component explicitly from react import.
  */
-export class ErrorBoundary extends React.Component<Props, State> {
-  // Fix: Move state to class property for better TypeScript inference and to avoid issues in constructor
+export class ErrorBoundary extends Component<Props, State> {
+  // Fixed state initialization for class components
   public state: State = {
     hasError: false,
     error: null,
@@ -32,7 +33,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   public render() {
-    // Fix: Accessing state properly defined through React.Component class inheritance
+    // Accessing this.state which is correctly inherited from Component
     if (this.state.hasError) {
       return (
         <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4">
@@ -46,7 +47,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
             </p>
             <div className="bg-black/30 p-4 rounded-lg mb-6 overflow-auto max-h-40">
                 <code className="text-red-400 text-xs font-mono break-all">
-                    {/* Fix: Accessing state error property safely */}
+                    {/* Safe access to state error property */}
                     {this.state.error?.message || 'Unknown Error'}
                 </code>
             </div>
@@ -65,7 +66,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
       );
     }
 
-    // Fix: Accessing props properly defined through React.Component class inheritance
+    // Accessing this.props which is correctly inherited from Component
     return this.props.children;
   }
 }

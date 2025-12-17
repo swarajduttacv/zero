@@ -63,17 +63,18 @@ export interface TradeOrder {
 export interface UserSettings {
   apiKey: string;
   apiSecret: string;
-  accessToken: string; // Added access token
+  accessToken: string;
   passcode: string;
   isLiveMode: boolean;
-  useProxy: boolean; // Added toggle for CORS proxy
+  useProxy: boolean;
+  backendUrl: string; // New field for the Node.js bridge
 }
 
 export interface User {
   id: string;
   name: string;
   email: string;
-  password?: string; // In a real app, never store plain text
+  password?: string;
   settings: UserSettings;
   chatHistory: ChatMessage[];
 }

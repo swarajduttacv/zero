@@ -31,61 +31,68 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeout = 150
 export const ZerodhaService = {
   async getPortfolio(settings: UserSettings): Promise<PortfolioSummary> {
     if (settings.isLiveMode) {
-      if (!settings.apiKey) throw new Error("Missing 'API Key'. Please check your settings.");
-      if (!settings.accessToken) throw new Error("Missing 'Access Token'. Please check your settings.");
-
+      if (!settings.apiKey && !settings.backendUrl) throw new Error("Missing Credentials or Backend URL.");
+      
       try {
-        const targetUrl = 'https://api.kite.trade/portfolio/holdings';
-        
-        // Define a broader set of proxies for better connectivity
-        const proxies = settings.useProxy ? [
-            { url: `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`, name: 'AllOrigins', type: 'json-wrap' },
-            { url: `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`, name: 'CorsProxy.io', type: 'direct' },
-            { url: `https://api.codetabs.com/v1/proxy?quest=${targetUrl}`, name: 'Codetabs', type: 'direct' }
-        ] : [{ url: targetUrl, name: 'Direct Connection', type: 'direct' }];
-
         let finalData: any = null;
         let lastError = "";
 
-        for (const proxy of proxies) {
+        // 1. PRIMARY: User's Custom Node.js Backend
+        if (settings.backendUrl) {
             try {
-                console.log(`ZeroGPT: Attempting sync via ${proxy.name}...`);
-                const res = await fetchWithTimeout(proxy.url, {
-                    method: 'GET',
-                    headers: proxy.type === 'direct' ? {
-                        'Authorization': `token ${settings.apiKey}:${settings.accessToken}`,
-                        'X-Kite-Version': '3'
-                    } : {} // AllOrigins doesn't forward headers easily in the simple URL format, but we'll try
-                }, 12000);
-                
+                const cleanUrl = settings.backendUrl.endsWith('/') ? settings.backendUrl.slice(0, -1) : settings.backendUrl;
+                // Fetching from the user's provided /holdings endpoint
+                const res = await fetchWithTimeout(`${cleanUrl}/holdings`, { method: 'GET' }, 10000);
                 if (res.ok) {
-                    const raw = await res.json();
-                    if (proxy.type === 'json-wrap') {
-                        // AllOrigins wraps the result in a 'contents' string which we need to parse
-                        if (raw.contents) {
-                             const nestedData = JSON.parse(raw.contents);
-                             if (nestedData.status === 'success') {
-                                 finalData = nestedData;
-                                 break;
-                             }
-                        }
-                    } else if (raw.status === 'success') {
-                        finalData = raw;
-                        break;
-                    }
+                    finalData = await res.json();
                 } else {
-                    lastError = `Proxy ${proxy.name} returned status ${res.status}`;
+                    lastError = `Local Backend returned error ${res.status}`;
                 }
             } catch (e: any) {
-                console.warn(`ZeroGPT: Connection failed via ${proxy.name}`, e.message);
-                lastError = e.message;
+                console.warn("ZeroGPT: Local Backend connection failed", e.message);
+                lastError = `Local Backend Unreachable: ${e.message}`;
+            }
+        }
+
+        // 2. SECONDARY: Public Proxies (Fall back only if no data from primary)
+        if (!finalData && settings.useProxy) {
+            const targetUrl = 'https://api.kite.trade/portfolio/holdings';
+            const kiteHeaders = {
+                'Authorization': `token ${settings.apiKey}:${settings.accessToken}`,
+                'X-Kite-Version': '3'
+            };
+
+            const proxies = [
+                { url: `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`, name: 'AllOrigins', type: 'json-wrap' },
+                { url: `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`, name: 'CorsProxy.io', type: 'direct' }
+            ];
+
+            for (const proxy of proxies) {
+                if (finalData) break;
+                try {
+                    const res = await fetchWithTimeout(proxy.url, {
+                        method: 'GET',
+                        headers: proxy.type === 'direct' ? kiteHeaders : {}
+                    }, 8000);
+                    
+                    if (res.ok) {
+                        const raw = await res.json();
+                        if (proxy.type === 'json-wrap' && raw.contents) {
+                            const nested = JSON.parse(raw.contents);
+                            if (nested.status === 'success') finalData = nested;
+                        } else if (raw.status === 'success') {
+                            finalData = raw;
+                        }
+                    }
+                } catch (e) {}
             }
         }
 
         if (!finalData) {
-            throw new Error(`Connectivity Blocked: Zerodha API is not reachable through available proxies. Last error: ${lastError}. Try using a CORS browser extension.`);
+            throw new Error(`Zerodha Connectivity Error: ${lastError || "Could not reach Zerodha via any method."}`);
         }
 
+        // Parse Standard Kite Response
         const holdingsRaw = finalData.data || [];
         const holdings: Stock[] = holdingsRaw.map((h: any) => ({
           symbol: h.tradingsymbol,
@@ -116,71 +123,43 @@ export const ZerodhaService = {
         };
 
       } catch (error: any) {
-        console.error("ZeroGPT: Zerodha Sync Failed:", error);
+        console.error("ZeroGPT: Portfolio Sync Failed", error);
         throw error;
       }
     }
 
-    // Mock Mode
-    const currentHoldings = [...MOCK_STOCKS];
-    const totalValue = currentHoldings.reduce((acc, s) => acc + (s.currentPrice * s.quantity), 0);
-    const investedValue = currentHoldings.reduce((acc, s) => acc + (s.averagePrice * s.quantity), 0);
-    const dayChange = currentHoldings.reduce((acc, s) => acc + ((s.currentPrice - s.previousClose) * s.quantity), 0);
-    const dayChangePercentage = totalValue > 0 ? (dayChange / (totalValue - dayChange)) * 100 : 0;
-    const totalPnl = totalValue - investedValue;
-    const totalPnlPercentage = investedValue > 0 ? (totalPnl / investedValue) * 100 : 0;
-
+    // Simulation Mode
     return {
-      totalValue,
-      investedValue,
-      dayChange,
-      dayChangePercentage,
-      totalPnl,
-      totalPnlPercentage,
+      totalValue: MOCK_STOCKS.reduce((acc, s) => acc + (s.currentPrice * s.quantity), 0),
+      investedValue: MOCK_STOCKS.reduce((acc, s) => acc + (s.averagePrice * s.quantity), 0),
+      dayChange: 4500,
+      dayChangePercentage: 1.2,
+      totalPnl: 15000,
+      totalPnlPercentage: 5.4,
       cashBalance: 50000,
-      holdings: currentHoldings
+      holdings: MOCK_STOCKS
     };
   },
 
   async executeTrade(order: TradeOrder, settings: UserSettings, passcode: string): Promise<boolean> {
     if (passcode !== settings.passcode) throw new Error("Invalid Security Passcode");
-
-    if (settings.isLiveMode) {
-         if (!settings.apiKey || !settings.accessToken) throw new Error("Live execution requires valid credentials.");
-         
-         const targetUrl = 'https://api.kite.trade/orders/regular';
-         const proxyUrl = settings.useProxy ? `https://corsproxy.io/?${encodeURIComponent(targetUrl)}` : targetUrl;
-
-         const formData = new URLSearchParams();
-         formData.append('tradingsymbol', order.symbol);
-         formData.append('exchange', 'NSE');
-         formData.append('transaction_type', order.transactionType);
-         formData.append('order_type', order.orderType);
-         formData.append('quantity', order.quantity.toString());
-         formData.append('product', 'CNC');
-         formData.append('validity', 'DAY');
-         if (order.price) formData.append('price', order.price.toString());
-
-         const response = await fetchWithTimeout(proxyUrl, {
-            method: 'POST',
-            headers: {
-                'Authorization': `token ${settings.apiKey}:${settings.accessToken}`,
-                'X-Kite-Version': '3',
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: formData
-         }, 15000);
-
-         if (!response.ok) {
-             const errText = await response.text();
-             let msg = "Order Execution Failed";
-             try { msg = JSON.parse(errText).message || msg; } catch (e) {}
-             throw new Error(msg);
-         }
-         return true;
-    } else {
-        await new Promise(resolve => setTimeout(resolve, 1500));
+    if (!settings.isLiveMode) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
         return true;
     }
+    
+    // For trade execution, we only try the custom backend if provided
+    if (settings.backendUrl) {
+        const cleanUrl = settings.backendUrl.endsWith('/') ? settings.backendUrl.slice(0, -1) : settings.backendUrl;
+        const response = await fetch(`${cleanUrl}/order`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(order)
+        });
+        if (!response.ok) throw new Error("Backend Trade Execution Failed");
+        return true;
+    }
+    
+    throw new Error("Live trading requires a configured Backend Bridge URL.");
   }
 };

@@ -43,14 +43,25 @@
         overflow: hidden;
       }
       
-      /* Force visibility for all inputs to prevent 'invisible text' issues */
-      input {
+      /* BULLETPROOF TYPING VISIBILITY */
+      input, textarea, select {
         color: #ffffff !important;
+        background-color: #020617 !important; /* Deepest Slate */
+        border-color: #334155 !important;
+        caret-color: #3b82f6 !important;
       }
-      input::placeholder {
-        color: #64748b !important;
+
+      input::placeholder, textarea::placeholder {
+        color: #475569 !important;
+        opacity: 0.8;
       }
-      
+
+      input:focus, textarea:focus {
+        border-color: #3b82f6 !important;
+        outline: none !important;
+        box-shadow: 0 0 0 1px #3b82f6 !important;
+      }
+
       #root:empty {
         display: flex;
         flex-direction: column;
