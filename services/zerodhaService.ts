@@ -9,21 +9,16 @@ const MOCK_STOCKS: Stock[] = [
   { symbol: 'ZOMATO', name: 'Zomato Ltd', quantity: 500, averagePrice: 120.00, currentPrice: 185.20, previousClose: 175.00, sector: 'Tech' },
 ];
 
-/**
- * Helper to fetch with a timeout
- */
-async function fetchWithTimeout(url: string, options: RequestInit, timeout = 15000): Promise<Response> {
+async function fetchWithTimeout(url: string, options: RequestInit, timeout = 10000): Promise<Response> {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
   try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal
-    });
+    const response = await fetch(url, { ...options, signal: controller.signal });
     clearTimeout(id);
     return response;
-  } catch (error) {
+  } catch (error: any) {
     clearTimeout(id);
+    if (error.name === 'AbortError') throw new Error("Request Timed Out. Check if your Bridge is running.");
     throw error;
   }
 }
@@ -31,69 +26,33 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeout = 150
 export const ZerodhaService = {
   async getPortfolio(settings: UserSettings): Promise<PortfolioSummary> {
     if (settings.isLiveMode) {
-      if (!settings.apiKey && !settings.backendUrl) throw new Error("Missing Credentials or Backend URL.");
+      if (!settings.backendUrl) throw new Error("Backend Bridge URL is required for live mode.");
       
       try {
-        let finalData: any = null;
-        let lastError = "";
-
-        // 1. PRIMARY: User's Custom Node.js Backend
-        if (settings.backendUrl) {
-            try {
-                const cleanUrl = settings.backendUrl.endsWith('/') ? settings.backendUrl.slice(0, -1) : settings.backendUrl;
-                // Fetching from the user's provided /holdings endpoint
-                const res = await fetchWithTimeout(`${cleanUrl}/holdings`, { method: 'GET' }, 10000);
-                if (res.ok) {
-                    finalData = await res.json();
-                } else {
-                    lastError = `Local Backend returned error ${res.status}`;
-                }
-            } catch (e: any) {
-                console.warn("ZeroGPT: Local Backend connection failed", e.message);
-                lastError = `Local Backend Unreachable: ${e.message}`;
-            }
+        const cleanUrl = settings.backendUrl.endsWith('/') ? settings.backendUrl.slice(0, -1) : settings.backendUrl;
+        
+        console.log(`ZeroGPT: Connecting to bridge at ${cleanUrl}/holdings...`);
+        
+        let response;
+        try {
+            response = await fetchWithTimeout(`${cleanUrl}/holdings`, { method: 'GET' });
+        } catch (e: any) {
+            // This is where "Failed to fetch" usually happens due to missing CORS or server down
+            throw new Error(`Local Bridge Unreachable: ${e.message}. Ensure your Node.js script is running on port 3000 and has CORS enabled.`);
         }
 
-        // 2. SECONDARY: Public Proxies (Fall back only if no data from primary)
-        if (!finalData && settings.useProxy) {
-            const targetUrl = 'https://api.kite.trade/portfolio/holdings';
-            const kiteHeaders = {
-                'Authorization': `token ${settings.apiKey}:${settings.accessToken}`,
-                'X-Kite-Version': '3'
-            };
-
-            const proxies = [
-                { url: `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`, name: 'AllOrigins', type: 'json-wrap' },
-                { url: `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`, name: 'CorsProxy.io', type: 'direct' }
-            ];
-
-            for (const proxy of proxies) {
-                if (finalData) break;
-                try {
-                    const res = await fetchWithTimeout(proxy.url, {
-                        method: 'GET',
-                        headers: proxy.type === 'direct' ? kiteHeaders : {}
-                    }, 8000);
-                    
-                    if (res.ok) {
-                        const raw = await res.json();
-                        if (proxy.type === 'json-wrap' && raw.contents) {
-                            const nested = JSON.parse(raw.contents);
-                            if (nested.status === 'success') finalData = nested;
-                        } else if (raw.status === 'success') {
-                            finalData = raw;
-                        }
-                    }
-                } catch (e) {}
-            }
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(`Bridge Error (${response.status}): ${errData.message || 'Check your API keys in the bridge console.'}`);
         }
 
-        if (!finalData) {
-            throw new Error(`Zerodha Connectivity Error: ${lastError || "Could not reach Zerodha via any method."}`);
+        const data = await response.json();
+        
+        if (data.status === 'error') {
+            throw new Error(`Zerodha API Error: ${data.message}`);
         }
 
-        // Parse Standard Kite Response
-        const holdingsRaw = finalData.data || [];
+        const holdingsRaw = data.data || [];
         const holdings: Stock[] = holdingsRaw.map((h: any) => ({
           symbol: h.tradingsymbol,
           name: h.tradingsymbol,
@@ -108,16 +67,14 @@ export const ZerodhaService = {
         const investedValue = holdings.reduce((acc, s) => acc + (s.averagePrice * s.quantity), 0);
         const dayChange = holdings.reduce((acc, s) => acc + ((s.currentPrice - s.previousClose) * s.quantity), 0);
         const dayChangePercentage = totalValue > 0 ? (dayChange / (totalValue - dayChange)) * 100 : 0;
-        const totalPnl = totalValue - investedValue;
-        const totalPnlPercentage = investedValue > 0 ? (totalPnl / investedValue) * 100 : 0;
 
         return {
           totalValue,
           investedValue,
           dayChange,
           dayChangePercentage,
-          totalPnl,
-          totalPnlPercentage,
+          totalPnl: totalValue - investedValue,
+          totalPnlPercentage: investedValue > 0 ? ((totalValue - investedValue) / investedValue) * 100 : 0,
           cashBalance: 0,
           holdings
         };
@@ -148,18 +105,23 @@ export const ZerodhaService = {
         return true;
     }
     
-    // For trade execution, we only try the custom backend if provided
     if (settings.backendUrl) {
         const cleanUrl = settings.backendUrl.endsWith('/') ? settings.backendUrl.slice(0, -1) : settings.backendUrl;
-        const response = await fetch(`${cleanUrl}/order`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(order)
-        });
-        if (!response.ok) throw new Error("Backend Trade Execution Failed");
-        return true;
+        try {
+            const response = await fetch(`${cleanUrl}/order`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(order)
+            });
+            if (!response.ok) throw new Error("Bridge rejected the trade request.");
+            const result = await response.json();
+            if (result.status === 'error') throw new Error(result.message);
+            return true;
+        } catch (e: any) {
+            throw new Error(`Trade Execution Failed: ${e.message}`);
+        }
     }
     
-    throw new Error("Live trading requires a configured Backend Bridge URL.");
+    throw new Error("Live trading requires a configured Bridge URL.");
   }
 };

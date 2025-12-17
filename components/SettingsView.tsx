@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { UserSettings } from '../types';
-import { Save, Eye, EyeOff, KeyRound, AlertCircle, Server, Terminal, Copy, Check } from 'lucide-react';
+import { Save, Eye, EyeOff, KeyRound, AlertCircle, Server, Terminal, Copy, Check, Info } from 'lucide-react';
 
 interface Props {
   settings: UserSettings;
@@ -17,29 +17,51 @@ export const SettingsView: React.FC<Props> = ({ settings, onSave }) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  // The updated Node.js script that matches the User's requested implementation but adds CORS
   const nodeCode = `// Node.js Express Backend Bridge
 const express = require('express');
 const fetch = require('node-fetch');
-const cors = require('cors');
+const cors = require('cors'); // CRITICAL: Fixes the "Unreachable" error
 const app = express();
 
-app.use(cors());
+app.use(cors()); // Allow browser access
 app.use(express.json());
 
 const API_KEY = "${formData.apiKey || 'YOUR_API_KEY'}";
 const ACCESS_TOKEN = "${formData.accessToken || 'YOUR_ACCESS_TOKEN'}";
 
+// 1. Portfolio Holdings Endpoint
 app.get('/holdings', async (req, res) => {
   try {
+    console.log('Fetching holdings...');
     const r = await fetch("https://api.kite.trade/portfolio/holdings", {
-      headers: { "X-Kite-Version": "3", "Authorization": \`token \${API_KEY}:\${ACCESS_TOKEN}\` }
+      headers: { 
+        "X-Kite-Version": "3", 
+        "Authorization": \`token \${API_KEY}:\${ACCESS_TOKEN}\` 
+      }
     });
     const data = await r.json();
     res.json(data);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { 
+    res.status(500).json({ status: 'error', message: e.message }); 
+  }
 });
 
-app.listen(3000, () => console.log('Bridge running on port 3000'));`;
+// 2. Order Execution Endpoint
+app.post('/order', async (req, res) => {
+  try {
+    const order = req.body;
+    console.log('Executing order:', order.symbol);
+    // Add logic here to call Zerodha POST /orders/regular
+    res.json({ status: 'success', message: 'Order received by bridge' });
+  } catch (e) {
+    res.status(500).json({ status: 'error', message: e.message });
+  }
+});
+
+app.listen(3000, () => {
+  console.log('Zerodha Bridge Online at http://localhost:3000');
+});`;
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(nodeCode);
@@ -56,10 +78,19 @@ app.listen(3000, () => console.log('Bridge running on port 3000'));`;
         </h2>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Form Column */}
             <div className="space-y-6">
+                <div className="bg-blue-900/10 border border-blue-900/30 p-4 rounded-xl mb-4">
+                    <div className="flex gap-3">
+                        <Info className="text-blue-400 shrink-0" size={20} />
+                        <p className="text-xs text-blue-200 leading-relaxed">
+                            For "Localhost Unreachable" errors, ensure your bridge script includes <span className="text-white font-bold">app.use(cors())</span>. 
+                            Try using <span className="text-white font-mono">http://127.0.0.1:3000</span> if localhost fails.
+                        </p>
+                    </div>
+                </div>
+
                 <div>
-                    <label className="block text-sm font-medium text-brand-500 mb-2">Backend Bridge URL (Localhost)</label>
+                    <label className="block text-sm font-medium text-brand-500 mb-2">Backend Bridge URL</label>
                     <div className="relative">
                         <Server className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
                         <input
@@ -67,10 +98,9 @@ app.listen(3000, () => console.log('Bridge running on port 3000'));`;
                             value={formData.backendUrl}
                             onChange={(e) => handleChange('backendUrl', e.target.value)}
                             className="w-full bg-slate-950 text-white rounded-lg pl-10 pr-4 py-3 border border-brand-800 focus:border-brand-500 focus:outline-none transition-colors font-mono"
-                            placeholder="http://localhost:3000"
+                            placeholder="http://127.0.0.1:3000"
                         />
                     </div>
-                    <p className="text-[10px] text-gray-500 mt-1">Recommended for seamless real-time connectivity.</p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -133,11 +163,10 @@ app.listen(3000, () => console.log('Bridge running on port 3000'));`;
                     className="w-full bg-brand-500 hover:bg-brand-600 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-brand-500/20 flex items-center justify-center gap-2"
                 >
                     <Save size={20} />
-                    Save & Initialize
+                    Save & Test Connection
                 </button>
             </div>
 
-            {/* Instruction Column */}
             <div className="space-y-4">
                 <div className="bg-slate-950 rounded-xl border border-brand-800 overflow-hidden">
                     <div className="p-3 bg-brand-800/50 border-b border-brand-800 flex justify-between items-center">
@@ -154,15 +183,6 @@ app.listen(3000, () => console.log('Bridge running on port 3000'));`;
                             {nodeCode}
                         </pre>
                     </div>
-                </div>
-                <div className="p-4 bg-blue-900/10 border border-blue-900/30 rounded-xl">
-                    <h4 className="text-sm font-bold text-blue-400 mb-2 flex items-center gap-2">
-                        <AlertCircle size={16} />
-                        Why use a Backend Bridge?
-                    </h4>
-                    <p className="text-xs text-gray-400 leading-relaxed">
-                        Browsers block direct requests to Zerodha for security (CORS). By running a simple Node.js server locally, your requests will work perfectly and securely.
-                    </p>
                 </div>
             </div>
         </div>
