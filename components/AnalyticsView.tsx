@@ -20,8 +20,16 @@ export const AnalyticsView: React.FC<Props> = ({ portfolio }) => {
     return acc;
   }, {} as Record<string, number>);
 
-  const sectorData = Object.entries(sectorDataMap).map(([name, value]) => ({ name, value }));
+  // Fix: Explicitly cast value to number to avoid arithmetic type errors
+  const sectorData = Object.entries(sectorDataMap).map(([name, value]) => ({ 
+    name, 
+    value: Number(value) 
+  }));
   
+  // Fix: Move sort logic out of render and ensure numeric comparison
+  const sortedSectorData = [...sectorData].sort((a, b) => b.value - a.value);
+  const topSectorName = sortedSectorData[0]?.name || 'a single sector';
+
   // Top Performers Data
   const performanceData = portfolio.holdings
     .map(s => ({
@@ -100,7 +108,7 @@ export const AnalyticsView: React.FC<Props> = ({ portfolio }) => {
             <div>
                 <h4 className="text-white font-bold text-lg mb-1">AI Strategy Insight</h4>
                 <p className="text-gray-300 text-sm leading-relaxed">
-                    Based on your sector allocation, your portfolio is heavily weighted towards <span className="text-white font-bold">{sectorData.sort((a,b)=>b.value - a.value)[0]?.name || 'a single sector'}</span>. 
+                    Based on your sector allocation, your portfolio is heavily weighted towards <span className="text-white font-bold">{topSectorName}</span>. 
                     Consider diversifying into defensive sectors like FMCG or Pharma to reduce volatility risk. 
                     Use the Chat Assistant to ask "How can I diversify my portfolio?" for specific trade recommendations.
                 </p>

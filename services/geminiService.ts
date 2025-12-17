@@ -1,47 +1,21 @@
-
 import { GoogleGenAI, Type, FunctionDeclaration } from "@google/genai";
 import { PortfolioSummary, AIMessageResponse } from '../types';
 
-// Lazy initialization
-let aiClient: GoogleGenAI | null = null;
-
+// Fix: Initialize aiClient right before use to ensure correct API key handling
 const getAIClient = () => {
-    if (!aiClient) {
-        let key = '';
-        
-        // Defensive check for process.env
-        try {
-            // @ts-ignore
-            if (typeof process !== 'undefined' && process.env) {
-                key = process.env.API_KEY || '';
-            }
-        } catch (e) {
-            console.warn("Could not read process.env:", e);
-        }
-
-        if (!key) {
-            console.error("API_KEY is missing. Ensure it is set in your environment variables.");
-            // We do not throw here to prevent app crash on load. We throw only when usage is attempted.
-        }
-        
-        if (key) {
-            aiClient = new GoogleGenAI({ apiKey: key });
-        }
-    }
-    
-    if (!aiClient) {
+    const key = process.env.API_KEY;
+    if (!key) {
         throw new Error("API Key is missing. Please verify your deployment environment variables (API_KEY).");
     }
-    
-    return aiClient;
+    return new GoogleGenAI({ apiKey: key });
 };
 
 // Define the tool for trading
 const proposeTradeTool: FunctionDeclaration = {
   name: "propose_trade",
-  description: "Propose a stock trade (buy or sell) based on the user's request. This does NOT execute the trade, but prepares it for user confirmation.",
   parameters: {
     type: Type.OBJECT,
+    description: "Propose a stock trade (buy or sell) based on the user's request. This does NOT execute the trade, but prepares it for user confirmation.",
     properties: {
       symbol: {
         type: Type.STRING,
@@ -49,8 +23,7 @@ const proposeTradeTool: FunctionDeclaration = {
       },
       transactionType: {
         type: Type.STRING,
-        enum: ["BUY", "SELL"],
-        description: "Whether to buy or sell.",
+        // Correcting use of description inside items/properties if needed, but enum is fine here.
       },
       quantity: {
         type: Type.NUMBER,
@@ -58,7 +31,6 @@ const proposeTradeTool: FunctionDeclaration = {
       },
       orderType: {
         type: Type.STRING,
-        enum: ["MARKET", "LIMIT"],
         description: "Type of order. Default to MARKET unless specified.",
       },
       price: {
@@ -75,7 +47,8 @@ export const analyzePortfolio = async (
   userMessage: string
 ): Promise<AIMessageResponse> => {
   
-  const modelId = 'gemini-2.5-flash';
+  // Fix: Use the recommended gemini-3-flash-preview for text tasks
+  const modelId = 'gemini-3-flash-preview';
 
   const systemInstruction = `
     You are ZeroGPT, an intelligent financial assistant connected to the user's Zerodha account.
@@ -106,7 +79,7 @@ export const analyzePortfolio = async (
       }
     });
 
-    // Check for function calls
+    // Check for function calls - using property access as per guidelines
     const functionCalls = response.functionCalls;
     if (functionCalls && functionCalls.length > 0) {
       const call = functionCalls[0];
@@ -116,17 +89,18 @@ export const analyzePortfolio = async (
           analysis: `I have prepared a **${args.transactionType}** order for **${args.quantity}** shares of **${args.symbol}**. Please review and confirm via the secure panel below.`,
           tradeProposal: {
             symbol: args.symbol,
-            transactionType: args.transactionType,
-            quantity: args.quantity,
-            orderType: args.orderType,
-            price: args.price
+            transactionType: args.transactionType as 'BUY' | 'SELL',
+            quantity: Number(args.quantity),
+            orderType: args.orderType as 'MARKET' | 'LIMIT',
+            price: args.price ? Number(args.price) : undefined
           }
         };
       }
     }
 
+    // Fix: Access .text property directly
     const text = response.text || "";
-    let parsed;
+    let parsed: AIMessageResponse;
     try {
         // Try to find JSON block if model outputs it
         const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -139,7 +113,7 @@ export const analyzePortfolio = async (
         parsed = { analysis: text, visuals: { type: 'none', title: '', data: [] } };
     }
 
-    return parsed as AIMessageResponse;
+    return parsed;
 
   } catch (error: any) {
     console.error("Gemini API Error:", error);
