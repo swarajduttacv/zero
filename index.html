@@ -17,10 +17,12 @@
           extend: {
             colors: {
               brand: {
-                900: '#1e293b',
-                800: '#334155',
-                500: '#3b82f6',
-                accent: '#f97316',
+                950: '#020617', // Deepest Slate
+                900: '#1e293b', // Slate 900
+                800: '#334155', // Slate 800
+                700: '#475569', // Slate 700
+                500: '#3b82f6', // Blue 500
+                accent: '#f97316', // Orange 500
               },
               profit: '#10b981',
               loss: '#ef4444',
@@ -41,6 +43,14 @@
         overflow: hidden;
       }
       
+      /* Force visibility for all inputs to prevent 'invisible text' issues */
+      input {
+        color: #ffffff !important;
+      }
+      input::placeholder {
+        color: #64748b !important;
+      }
+      
       #root:empty {
         display: flex;
         flex-direction: column;
@@ -51,7 +61,6 @@
         background-color: #0f172a;
       }
 
-      /* Animated Spinner */
       .initial-loader {
         width: 40px;
         height: 40px;
@@ -70,7 +79,6 @@
         animation: pulse 2s infinite;
       }
 
-      /* Troubleshooting UI (hidden by default) */
       #troubleshoot {
         display: none;
         margin-top: 2rem;
@@ -111,17 +119,16 @@
     </div>
 
     <script>
-      // Troubleshoot fallback timer
       setTimeout(() => {
         const troubleshoot = document.getElementById('troubleshoot');
         const status = document.getElementById('status-text');
-        if (document.getElementById('root').children.length <= 2) {
+        const root = document.getElementById('root');
+        if (root && root.children.length <= 2) {
           if (troubleshoot) troubleshoot.style.display = 'block';
           if (status) status.innerText = 'Initialization Delayed';
         }
       }, 5000);
     </script>
-    <!-- Entry point -->
     <script type="module" src="index.tsx"></script>
   </body>
 </html>

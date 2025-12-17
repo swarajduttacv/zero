@@ -12,7 +12,7 @@ const MOCK_STOCKS: Stock[] = [
 /**
  * Helper to fetch with a timeout
  */
-async function fetchWithTimeout(url: string, options: RequestInit, timeout = 10000): Promise<Response> {
+async function fetchWithTimeout(url: string, options: RequestInit, timeout = 15000): Promise<Response> {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
   try {
@@ -31,56 +31,62 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeout = 100
 export const ZerodhaService = {
   async getPortfolio(settings: UserSettings): Promise<PortfolioSummary> {
     if (settings.isLiveMode) {
-      if (!settings.apiKey) throw new Error("Missing 'API Key'.");
-      if (!settings.accessToken) throw new Error("Missing 'Access Token'.");
+      if (!settings.apiKey) throw new Error("Missing 'API Key'. Please check your settings.");
+      if (!settings.accessToken) throw new Error("Missing 'Access Token'. Please check your settings.");
 
       try {
         const targetUrl = 'https://api.kite.trade/portfolio/holdings';
+        
+        // Define a broader set of proxies for better connectivity
         const proxies = settings.useProxy ? [
-            { url: `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`, name: 'CorsProxy.io' },
-            { url: `https://thingproxy.freeboard.io/fetch/${targetUrl}`, name: 'ThingProxy' }
-        ] : [{ url: targetUrl, name: 'Direct Connection' }];
+            { url: `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`, name: 'AllOrigins', type: 'json-wrap' },
+            { url: `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`, name: 'CorsProxy.io', type: 'direct' },
+            { url: `https://api.codetabs.com/v1/proxy?quest=${targetUrl}`, name: 'Codetabs', type: 'direct' }
+        ] : [{ url: targetUrl, name: 'Direct Connection', type: 'direct' }];
 
-        let response: Response | null = null;
+        let finalData: any = null;
+        let lastError = "";
 
         for (const proxy of proxies) {
             try {
-                console.log(`Connecting via ${proxy.name}...`);
+                console.log(`ZeroGPT: Attempting sync via ${proxy.name}...`);
                 const res = await fetchWithTimeout(proxy.url, {
                     method: 'GET',
-                    headers: {
+                    headers: proxy.type === 'direct' ? {
                         'Authorization': `token ${settings.apiKey}:${settings.accessToken}`,
                         'X-Kite-Version': '3'
-                    }
-                }, 8000); // 8 second timeout per proxy
+                    } : {} // AllOrigins doesn't forward headers easily in the simple URL format, but we'll try
+                }, 12000);
                 
-                if (res.ok || res.status < 500) {
-                    response = res;
-                    break;
+                if (res.ok) {
+                    const raw = await res.json();
+                    if (proxy.type === 'json-wrap') {
+                        // AllOrigins wraps the result in a 'contents' string which we need to parse
+                        if (raw.contents) {
+                             const nestedData = JSON.parse(raw.contents);
+                             if (nestedData.status === 'success') {
+                                 finalData = nestedData;
+                                 break;
+                             }
+                        }
+                    } else if (raw.status === 'success') {
+                        finalData = raw;
+                        break;
+                    }
+                } else {
+                    lastError = `Proxy ${proxy.name} returned status ${res.status}`;
                 }
-            } catch (e) {
-                console.warn(`Connection failed via ${proxy.name}`, e);
+            } catch (e: any) {
+                console.warn(`ZeroGPT: Connection failed via ${proxy.name}`, e.message);
+                lastError = e.message;
             }
         }
 
-        if (!response) {
-            throw new Error("Connectivity Issue: All connection attempts timed out or were blocked.");
+        if (!finalData) {
+            throw new Error(`Connectivity Blocked: Zerodha API is not reachable through available proxies. Last error: ${lastError}. Try using a CORS browser extension.`);
         }
 
-        if (!response.ok) {
-          const errText = await response.text();
-          let detailedMsg = `Server Error ${response.status}`;
-          try {
-              const errJson = JSON.parse(errText);
-              detailedMsg = errJson.message || detailedMsg;
-          } catch(e) {}
-          throw new Error(detailedMsg);
-        }
-
-        const data = await response.json();
-        if (data.status === 'error') throw new Error(data.message);
-
-        const holdingsRaw = data.data || [];
+        const holdingsRaw = finalData.data || [];
         const holdings: Stock[] = holdingsRaw.map((h: any) => ({
           symbol: h.tradingsymbol,
           name: h.tradingsymbol,
@@ -110,7 +116,7 @@ export const ZerodhaService = {
         };
 
       } catch (error: any) {
-        console.error("Zerodha Sync Failed:", error);
+        console.error("ZeroGPT: Zerodha Sync Failed:", error);
         throw error;
       }
     }
@@ -137,10 +143,10 @@ export const ZerodhaService = {
   },
 
   async executeTrade(order: TradeOrder, settings: UserSettings, passcode: string): Promise<boolean> {
-    if (passcode !== settings.passcode) throw new Error("Invalid Passcode");
+    if (passcode !== settings.passcode) throw new Error("Invalid Security Passcode");
 
     if (settings.isLiveMode) {
-         if (!settings.apiKey || !settings.accessToken) throw new Error("Live execution requires credentials.");
+         if (!settings.apiKey || !settings.accessToken) throw new Error("Live execution requires valid credentials.");
          
          const targetUrl = 'https://api.kite.trade/orders/regular';
          const proxyUrl = settings.useProxy ? `https://corsproxy.io/?${encodeURIComponent(targetUrl)}` : targetUrl;
@@ -163,11 +169,11 @@ export const ZerodhaService = {
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
             body: formData
-         }, 10000);
+         }, 15000);
 
          if (!response.ok) {
              const errText = await response.text();
-             let msg = "Order Failed";
+             let msg = "Order Execution Failed";
              try { msg = JSON.parse(errText).message || msg; } catch (e) {}
              throw new Error(msg);
          }

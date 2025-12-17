@@ -23,7 +23,6 @@ export const SettingsView: React.FC<Props> = ({ settings, onSave }) => {
         System Configuration
       </h2>
 
-      {/* Connectivity Guide */}
       <div className="bg-blue-950/40 border border-blue-900 p-5 rounded-xl mb-8">
           <div className="flex items-start gap-3">
               <div className="p-2 bg-blue-900/50 rounded-lg shrink-0">
@@ -32,26 +31,21 @@ export const SettingsView: React.FC<Props> = ({ settings, onSave }) => {
               <div>
                   <h3 className="font-bold text-blue-100 text-sm mb-1">Connecting to Live Zerodha API</h3>
                   <p className="text-xs text-blue-300 leading-relaxed mb-3">
-                      Connecting a web app directly to Zerodha requires bypassing browser CORS security.
-                      We provide two methods:
+                      Zerodha security often blocks direct web requests. We recommend using a CORS browser extension for the most stable experience.
                   </p>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
                       <div className="bg-blue-900/20 p-3 rounded border border-blue-800/50">
-                          <h4 className="font-bold text-xs text-white mb-1">Method A: Public Proxy (Easiest)</h4>
+                          <h4 className="font-bold text-xs text-white mb-1">Method A: Proxy (Enabled below)</h4>
                           <p className="text-[10px] text-gray-400">
-                              Uses public servers to route your request. <br/>
-                              <span className="text-yellow-500">Note: May be slow or blocked.</span>
+                              Routes requests through public proxy servers.
                           </p>
-                          <div className="mt-2 text-[10px] font-mono bg-black/30 p-1 rounded text-gray-300">
-                             Check "Use CORS Proxy" below
-                          </div>
                       </div>
                       
                       <div className="bg-green-900/10 p-3 rounded border border-green-900/30">
-                          <h4 className="font-bold text-xs text-green-400 mb-1">Method B: Direct (Most Reliable)</h4>
+                          <h4 className="font-bold text-xs text-green-400 mb-1">Method B: Direct (Recommended)</h4>
                           <p className="text-[10px] text-gray-400">
-                              Connects directly from your browser. Requires an extension.
+                              Requires a browser extension to allow direct connections.
                           </p>
                           <a href="https://chromewebstore.google.com/detail/allow-cors-access-control/lhobafahddgcelffkeicbaginigeejlf" 
                              target="_blank" rel="noreferrer" 
@@ -66,28 +60,28 @@ export const SettingsView: React.FC<Props> = ({ settings, onSave }) => {
 
       <div className="space-y-6">
         <div>
-          <label className="block text-sm font-medium text-brand-500 mb-2">Zerodha API Key (App Key)</label>
+          <label className="block text-sm font-medium text-brand-500 mb-2">Zerodha API Key</label>
           <input
             type="text"
             value={formData.apiKey}
             onChange={(e) => handleChange('apiKey', e.target.value)}
-            className="w-full bg-brand-950 text-white rounded-lg px-4 py-3 border border-brand-500/50 focus:border-brand-500 focus:outline-none transition-colors font-mono"
-            placeholder="e.g. abcd1234efgh5678"
+            className="w-full bg-brand-950 text-white rounded-lg px-4 py-3 border border-brand-800 focus:border-brand-500 focus:outline-none transition-colors font-mono"
+            placeholder="Kite App Key"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-400 mb-2">Daily Access Token</label>
+          <label className="block text-sm font-medium text-gray-400 mb-2">Access Token</label>
           <input
             type="password"
             value={formData.accessToken}
             onChange={(e) => handleChange('accessToken', e.target.value)}
             className="w-full bg-brand-950 text-white rounded-lg px-4 py-3 border border-brand-800 focus:border-brand-500 focus:outline-none transition-colors font-mono"
-            placeholder="Paste your daily access token here"
+            placeholder="Kite Session Token"
           />
           <p className="text-xs text-gray-500 mt-1">
              <AlertCircle size={10} className="inline mr-1"/>
-             This token expires daily. Generate a new one from your Kite Developer Console login flow.
+             This token expires daily.
           </p>
         </div>
 
@@ -100,7 +94,7 @@ export const SettingsView: React.FC<Props> = ({ settings, onSave }) => {
               onChange={(e) => handleChange('passcode', e.target.value)}
               maxLength={6}
               className="w-full bg-brand-950 text-white rounded-lg px-4 py-3 border border-brand-800 focus:border-brand-500 focus:outline-none transition-colors tracking-widest font-mono"
-              placeholder="Set a 4-6 digit passcode"
+              placeholder="Set 4-6 digit passcode"
             />
             <button
               onClick={() => setShowPasscode(!showPasscode)}
@@ -118,7 +112,7 @@ export const SettingsView: React.FC<Props> = ({ settings, onSave }) => {
                     id="liveMode"
                     checked={formData.isLiveMode}
                     onChange={(e) => handleChange('isLiveMode', e.target.checked)}
-                    className="w-5 h-5 rounded border-gray-600 text-brand-500 focus:ring-brand-500 bg-brand-900"
+                    className="w-5 h-5 rounded border-gray-600 text-brand-500 focus:ring-brand-500 bg-brand-950"
                 />
                 <label htmlFor="liveMode" className="text-sm text-gray-300 font-medium cursor-pointer select-none">
                     Enable Live Data
@@ -131,7 +125,7 @@ export const SettingsView: React.FC<Props> = ({ settings, onSave }) => {
                     id="useProxy"
                     checked={formData.useProxy}
                     onChange={(e) => handleChange('useProxy', e.target.checked)}
-                    className="w-5 h-5 rounded border-gray-600 text-brand-500 focus:ring-brand-500 bg-brand-900"
+                    className="w-5 h-5 rounded border-gray-600 text-brand-500 focus:ring-brand-500 bg-brand-950"
                 />
                 <label htmlFor="useProxy" className="text-sm text-gray-300 font-medium cursor-pointer select-none flex items-center gap-2">
                     <Globe size={14} />
