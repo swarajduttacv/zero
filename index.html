@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -7,28 +6,23 @@
     <title>ZeroGPT Portfolio</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-      // 1. CRITICAL: Polyfill process.env BEFORE any modules load
       window.process = window.process || { env: {} };
       window.process.env = window.process.env || {};
       
-      // Configure Tailwind
       tailwind.config = {
         theme: {
           extend: {
             colors: {
               brand: {
-                950: '#020617', // Deepest Slate
-                900: '#1e293b', // Slate 900
-                800: '#334155', // Slate 800
-                700: '#475569', // Slate 700
-                500: '#3b82f6', // Blue 500
-                accent: '#f97316', // Orange 500
+                950: '#020617',
+                900: '#1e293b',
+                800: '#334155',
+                700: '#475569',
+                500: '#3b82f6',
+                accent: '#f97316',
               },
               profit: '#10b981',
               loss: '#ef4444',
-            },
-            fontFamily: {
-              sans: ['Inter', 'sans-serif'],
             },
           },
         },
@@ -43,23 +37,22 @@
         overflow: hidden;
       }
       
-      /* BULLETPROOF TYPING VISIBILITY */
+      /* CRITICAL: Force input visibility */
       input, textarea, select {
         color: #ffffff !important;
-        background-color: #020617 !important; /* Deepest Slate */
-        border-color: #334155 !important;
-        caret-color: #3b82f6 !important;
+        background-color: #020617 !important;
+        border: 1px solid #334155 !important;
+        font-family: inherit;
       }
-
-      input::placeholder, textarea::placeholder {
-        color: #475569 !important;
-        opacity: 0.8;
-      }
-
+      
       input:focus, textarea:focus {
         border-color: #3b82f6 !important;
         outline: none !important;
-        box-shadow: 0 0 0 1px #3b82f6 !important;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3) !important;
+      }
+
+      input::placeholder {
+        color: #64748b !important;
       }
 
       #root:empty {
@@ -79,26 +72,8 @@
         border-top-color: #3b82f6;
         border-radius: 50%;
         animation: spin 1s linear infinite;
-        margin-bottom: 1rem;
       }
-      
-      .initial-text {
-        font-family: sans-serif;
-        color: #94a3b8;
-        font-size: 0.875rem;
-        letter-spacing: 0.025em;
-        animation: pulse 2s infinite;
-      }
-
-      #troubleshoot {
-        display: none;
-        margin-top: 2rem;
-        text-align: center;
-        max-width: 300px;
-      }
-
       @keyframes spin { to { transform: rotate(360deg); } }
-      @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     </style>
     <script type="importmap">
     {
@@ -116,30 +91,7 @@
     </script>
   </head>
   <body>
-    <div id="root">
-      <div class="initial-loader"></div>
-      <div class="initial-text" id="status-text">Synchronizing Modules...</div>
-      
-      <div id="troubleshoot">
-        <p style="color: #ef4444; font-size: 0.75rem; margin-bottom: 1rem;">Startup is taking longer than expected.</p>
-        <button onclick="localStorage.clear(); window.location.reload();" 
-                style="background: #1e293b; color: white; padding: 8px 16px; border-radius: 6px; border: 1px solid #334155; font-size: 0.75rem; cursor: pointer; transition: all 0.2s;">
-          Reset Data & Reload
-        </button>
-      </div>
-    </div>
-
-    <script>
-      setTimeout(() => {
-        const troubleshoot = document.getElementById('troubleshoot');
-        const status = document.getElementById('status-text');
-        const root = document.getElementById('root');
-        if (root && root.children.length <= 2) {
-          if (troubleshoot) troubleshoot.style.display = 'block';
-          if (status) status.innerText = 'Initialization Delayed';
-        }
-      }, 5000);
-    </script>
+    <div id="root"><div class="initial-loader"></div></div>
     <script type="module" src="index.tsx"></script>
   </body>
 </html>
