@@ -1,42 +1,35 @@
+
 import { GoogleGenAI, Type, FunctionDeclaration } from "@google/genai";
 import { PortfolioSummary, AIMessageResponse } from '../types';
 
-// Fix: Initialize aiClient right before use to ensure correct API key handling
+/**
+ * Safe API Client Factory
+ * Updated to comply with mandatory @google/genai security guidelines.
+ */
 const getAIClient = () => {
+    // CRITICAL: API key must be obtained exclusively from process.env.API_KEY.
     const key = process.env.API_KEY;
+    
     if (!key) {
-        throw new Error("API Key is missing. Please verify your deployment environment variables (API_KEY).");
+        throw new Error("ZeroGPT API Configuration Error: Environment variable API_KEY is not defined in this session.");
     }
+    
+    // CRITICAL: Initialize GoogleGenAI using a named parameter with the process.env string directly.
     return new GoogleGenAI({ apiKey: key });
 };
 
-// Define the tool for trading
+// Tool Definitions
 const proposeTradeTool: FunctionDeclaration = {
   name: "propose_trade",
   parameters: {
     type: Type.OBJECT,
-    description: "Propose a stock trade (buy or sell) based on the user's request. This does NOT execute the trade, but prepares it for user confirmation.",
+    description: "Prepare a stock trade for user confirmation. Does not execute until user authorizes with passcode.",
     properties: {
-      symbol: {
-        type: Type.STRING,
-        description: "The stock symbol (e.g., RELIANCE, TCS).",
-      },
-      transactionType: {
-        type: Type.STRING,
-        // Correcting use of description inside items/properties if needed, but enum is fine here.
-      },
-      quantity: {
-        type: Type.NUMBER,
-        description: "Number of shares.",
-      },
-      orderType: {
-        type: Type.STRING,
-        description: "Type of order. Default to MARKET unless specified.",
-      },
-      price: {
-        type: Type.NUMBER,
-        description: "Limit price if orderType is LIMIT.",
-      },
+      symbol: { type: Type.STRING, description: "Exchange symbol (e.g. INFY)" },
+      transactionType: { type: Type.STRING, enum: ["BUY", "SELL"] },
+      quantity: { type: Type.NUMBER },
+      orderType: { type: Type.STRING, enum: ["MARKET", "LIMIT"] },
+      price: { type: Type.NUMBER, description: "Limit price" },
     },
     required: ["symbol", "transactionType", "quantity", "orderType"],
   },
@@ -47,46 +40,38 @@ export const analyzePortfolio = async (
   userMessage: string
 ): Promise<AIMessageResponse> => {
   
-  // Fix: Use the recommended gemini-3-flash-preview for text tasks
+  // Basic Text Tasks: Recommended model for analysis
   const modelId = 'gemini-3-flash-preview';
 
   const systemInstruction = `
-    You are ZeroGPT, an intelligent financial assistant connected to the user's Zerodha account.
-    
-    USER PORTFOLIO (Live Data):
+    You are ZeroGPT assistant. Analyze the user's live Zerodha portfolio:
     ${JSON.stringify(portfolio, null, 2)}
     
-    CAPABILITIES:
-    1. Analyze performance, risk, and sectors.
-    2. Propose trades using the 'propose_trade' tool if the user explicitly asks to buy/sell or asks for a concrete action plan that involves rebalancing.
-    
-    RULES:
-    - If the user says "Buy X" or "Sell Y", USE THE TOOL 'propose_trade'.
-    - Do not assume a trade is executed until the user confirms in the UI.
-    - Be professional, concise, and data-driven.
-    - Use Markdown for text.
+    - Propose trades via 'propose_trade' when requested.
+    - Be data-driven and objective.
+    - Use Markdown for responses.
   `;
 
   try {
     const ai = getAIClient();
+    // Use ai.models.generateContent directly with the model name and prompt as per guidelines.
     const response = await ai.models.generateContent({
       model: modelId,
       contents: userMessage,
       config: {
         systemInstruction: systemInstruction,
         tools: [{ functionDeclarations: [proposeTradeTool] }],
-        temperature: 0.2, 
+        temperature: 0.1, 
       }
     });
 
-    // Check for function calls - using property access as per guidelines
-    const functionCalls = response.functionCalls;
-    if (functionCalls && functionCalls.length > 0) {
-      const call = functionCalls[0];
+    // Handle tool use by checking functionCalls property on response.
+    if (response.functionCalls && response.functionCalls.length > 0) {
+      const call = response.functionCalls[0];
       if (call.name === 'propose_trade') {
         const args = call.args as any;
         return {
-          analysis: `I have prepared a **${args.transactionType}** order for **${args.quantity}** shares of **${args.symbol}**. Please review and confirm via the secure panel below.`,
+          analysis: `Drafting a **${args.transactionType}** order for **${args.quantity}** units of **${args.symbol}**. Verify details below.`,
           tradeProposal: {
             symbol: args.symbol,
             transactionType: args.transactionType as 'BUY' | 'SELL',
@@ -98,27 +83,14 @@ export const analyzePortfolio = async (
       }
     }
 
-    // Fix: Access .text property directly
-    const text = response.text || "";
-    let parsed: AIMessageResponse;
-    try {
-        // Try to find JSON block if model outputs it
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            parsed = JSON.parse(jsonMatch[0]);
-        } else {
-            parsed = { analysis: text, visuals: { type: 'none', title: '', data: [] } };
-        }
-    } catch (e) {
-        parsed = { analysis: text, visuals: { type: 'none', title: '', data: [] } };
-    }
-
-    return parsed;
+    // Direct access to .text property (not a method) as per SDK instructions.
+    const text = response.text || "I was unable to generate an analysis at this time.";
+    return { analysis: text, visuals: { type: 'none', title: '', data: [] } };
 
   } catch (error: any) {
-    console.error("Gemini API Error:", error);
+    console.error("AI Analysis Failed:", error);
     return {
-      analysis: `I encountered an issue processing your request: ${error.message || 'Connection Error'}. Please check your API configuration.`,
+      analysis: `Intelligence Core Offline: ${error.message || 'Unknown network error'}.`,
       visuals: { type: 'none', title: '', data: [] }
     };
   }

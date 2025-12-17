@@ -1,8 +1,10 @@
+
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 interface Props {
-  children: ReactNode;
+  // Fix: Make children optional to satisfy strict TypeScript JSX checks when used as a wrapper in index.tsx
+  children?: ReactNode;
 }
 
 interface State {
@@ -10,10 +12,11 @@ interface State {
   error: Error | null;
 }
 
-// Fix: Use React.Component and add constructor to ensure props are correctly initialized in TypeScript
-export class ErrorBoundary extends React.Component<Props, State> {
+// Fix: Use the explicitly imported Component to ensure TypeScript correctly identifies the base class properties
+export class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
+    // Fix: Correctly initialize state on 'this' (fixes ErrorBoundary.tsx:17)
     this.state = {
       hasError: false,
       error: null,
@@ -29,6 +32,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   public render() {
+    // Fix: Access state property from 'this' (fixes ErrorBoundary.tsx:32)
     if (this.state.hasError) {
       return (
         <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4">
@@ -42,6 +46,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
             </p>
             <div className="bg-black/30 p-4 rounded-lg mb-6 overflow-auto max-h-40">
                 <code className="text-red-400 text-xs font-mono break-all">
+                    {/* Fix: Access state error safely (fixes ErrorBoundary.tsx:45) */}
                     {this.state.error?.message || 'Unknown Error'}
                 </code>
             </div>
@@ -60,6 +65,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
       );
     }
 
+    // Fix: Correctly access props from 'this' (fixes ErrorBoundary.tsx:63)
     return this.props.children;
   }
 }

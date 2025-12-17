@@ -4,18 +4,20 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
-console.log("ZeroGPT: Script execution started.");
+/**
+ * ENTRY POINT BOOTSTRAP
+ */
+console.log("ZeroGPT: Main module loaded.");
 
-const renderApp = () => {
+const init = () => {
   const container = document.getElementById('root');
-  
   if (!container) {
-    console.error("ZeroGPT: Critical - Could not find root container.");
+    console.error("ZeroGPT: FATAL - Root container not found.");
     return;
   }
 
   try {
-    console.log("ZeroGPT: Attempting to mount React application...");
+    console.log("ZeroGPT: Initializing React root...");
     const root = createRoot(container);
     root.render(
       <React.StrictMode>
@@ -24,24 +26,24 @@ const renderApp = () => {
         </ErrorBoundary>
       </React.StrictMode>
     );
-    console.log("ZeroGPT: Render command issued successfully.");
-  } catch (error) {
-    console.error("ZeroGPT: Failed to mount React app:", error);
+    console.log("ZeroGPT: React tree rendered.");
+  } catch (err) {
+    console.error("ZeroGPT: Initialization error:", err);
+    // Overwrite root with error UI if React fails to even start
     container.innerHTML = `
-      <div style="height: 100vh; background: #0f172a; color: #ef4444; padding: 40px; font-family: sans-serif;">
-        <h1 style="font-size: 24px; margin-bottom: 20px;">Startup Failure</h1>
-        <p style="color: #94a3b8; margin-bottom: 20px;">The app failed to mount. This usually indicates a script loading error.</p>
-        <pre style="background: #1e293b; padding: 20px; border-radius: 8px; overflow: auto; border: 1px solid #dc2626;">${error instanceof Error ? error.message : 'Unknown Mounting Error'}</pre>
-        <button onclick="window.location.reload()" style="margin-top: 20px; padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer;">Retry Loading</button>
+      <div style="background:#0f172a; color:#ef4444; height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px; font-family:sans-serif; text-align:center;">
+        <h2 style="margin-bottom:10px;">Critical Startup Failure</h2>
+        <pre style="background:#1e293b; padding:15px; border-radius:8px; font-size:12px; max-width:100%; overflow:auto; border:1px solid #dc2626; color:#f8fafc;">${err instanceof Error ? err.message : String(err)}</pre>
+        <button onclick="window.location.reload()" style="margin-top:20px; background:#3b82f6; color:white; border:none; padding:10px 20px; border-radius:6px; cursor:pointer;">Retry Now</button>
       </div>
     `;
   }
 };
 
-// Handle global unhandled errors
-window.addEventListener('error', (event) => {
-  console.error("ZeroGPT: Global Error Caught:", event.error || event.message);
-});
+// Global error listener for assets or runtime crashes
+window.onerror = (message, source, lineno, colno, error) => {
+  console.error("ZeroGPT: Caught global error:", { message, source, lineno, colno, error });
+};
 
-// Run the render
-renderApp();
+// Execute initialization
+init();
