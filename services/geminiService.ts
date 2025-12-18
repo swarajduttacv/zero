@@ -1,18 +1,9 @@
+
 import { GoogleGenAI, Type, FunctionDeclaration } from "@google/genai";
 import { PortfolioSummary, AIMessageResponse } from '../types';
 
-/**
- * Initializes the AI client.
- * Uses process.env.API_KEY as mandated.
- */
-const getAIClient = () => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) {
-    // Return null rather than throwing immediately to allow the UI to handle it as a specific state
-    return null;
-  }
-  return new GoogleGenAI({ apiKey });
-};
+// Strict adherence to the mandated initialization pattern
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const proposeTradeTool: FunctionDeclaration = {
   name: "propose_trade",
@@ -34,11 +25,10 @@ export const analyzePortfolio = async (
   portfolio: PortfolioSummary, 
   userMessage: string
 ): Promise<AIMessageResponse> => {
-  const ai = getAIClient();
   
-  if (!ai) {
+  if (!process.env.API_KEY) {
     return {
-      analysis: "⚠️ **Gemini API Key Missing**: Please ensure the environment variable `API_KEY` is configured in your project settings.",
+      analysis: "⚠️ **Environment Error**: `API_KEY` not found in `process.env`. If you are on VerCel, ensure the variable name is exactly `API_KEY` and the project is re-deployed.",
       visuals: { type: 'none', title: '', data: [] }
     };
   }
@@ -86,14 +76,14 @@ export const analyzePortfolio = async (
     }
 
     return { 
-      analysis: response.text || "I've analyzed your request but couldn't generate a text response. Please try again.",
+      analysis: response.text || "I've analyzed your data, but couldn't produce a summary. Please try again.",
       visuals: { type: 'none', title: '', data: [] } 
     };
 
   } catch (error: any) {
-    console.error("AI Error:", error);
+    console.error("ZeroGPT: AI Analysis failed", error);
     return {
-      analysis: `Failed to generate analysis: ${error.message}`,
+      analysis: `AI Configuration Error: ${error.message}. Please check your environment variables.`,
       visuals: { type: 'none', title: '', data: [] }
     };
   }

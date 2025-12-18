@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
 import { UserSettings } from '../types';
-import { Save, Eye, EyeOff, KeyRound, Server, Terminal, Copy, Check, Info, AlertTriangle } from 'lucide-react';
+import { Save, Eye, EyeOff, KeyRound, Server, Terminal, Copy, Check, Info, AlertTriangle, ExternalLink } from 'lucide-react';
 
 interface Props {
   settings: UserSettings;
@@ -18,75 +19,80 @@ export const SettingsView: React.FC<Props> = ({ settings, onSave }) => {
 
   const nodeCode = `/**
  * ZERODHA BRIDGE SERVER (Node.js)
- * 1. Create a folder: mkdir zerodha-bridge
- * 2. Init project: npm init -y
- * 3. Install deps: npm install express node-fetch@2 cors
+ * Instructions:
+ * 1. Create directory: mkdir kite-bridge && cd kite-bridge
+ * 2. Init: npm init -y
+ * 3. Install: npm install express node-fetch@2 cors
+ * 4. Create server.js and paste this code.
+ * 5. Run: node server.js
  */
 const express = require('express');
 const fetch = require('node-fetch');
-const cors = require('cors'); // CRITICAL FOR BROWSER CONNECTIVITY
-const app = express();
+const cors = require('cors'); 
 
-app.use(cors()); // Allow your browser to talk to this server
+const app = express();
+app.use(cors()); // CRITICAL: Allows browser connection
 app.use(express.json());
 
-const API_KEY = "${formData.apiKey || 'YOUR_API_KEY'}";
-const ACCESS_TOKEN = "${formData.accessToken || 'YOUR_ACCESS_TOKEN'}";
+const KITE_API_KEY = "${formData.apiKey || 'YOUR_API_KEY'}";
+const KITE_ACCESS_TOKEN = "${formData.accessToken || 'YOUR_ACCESS_TOKEN'}";
 
-// GET Holdings
+// Portfolio Endpoint
 app.get('/holdings', async (req, res) => {
   try {
-    console.log('Syncing holdings from Zerodha...');
-    const r = await fetch("https://api.kite.trade/portfolio/holdings", {
+    console.log('Syncing holdings...');
+    const response = await fetch("https://api.kite.trade/portfolio/holdings", {
       headers: { 
         "X-Kite-Version": "3", 
-        "Authorization": \`token \${API_KEY}:\${ACCESS_TOKEN}\` 
+        "Authorization": \`token \${KITE_API_KEY}:\${KITE_ACCESS_TOKEN}\` 
       }
     });
-    const data = await r.json();
+    const data = await response.json();
     res.json(data);
-  } catch (e) { 
-    res.status(500).json({ status: 'error', message: e.message }); 
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ status: 'error', message: e.message });
   }
 });
 
-// POST Order
+// Order Execution Endpoint
 app.post('/order', async (req, res) => {
   try {
     const order = req.body;
-    console.log('Order received:', order.symbol, order.transactionType);
-    // Logic to call Zerodha POST /orders/regular goes here
-    res.json({ status: 'success', message: 'Order forwarded to bridge' });
+    console.log('Order received for:', order.symbol);
+    // Add Kite Order POST logic here
+    res.json({ status: 'success', message: 'Bridge received order' });
   } catch (e) {
     res.status(500).json({ status: 'error', message: e.message });
   }
 });
 
-app.listen(3000, () => {
-  console.log('🚀 Zerodha Bridge ready at http://localhost:3000');
-});`;
+const PORT = 3000;
+app.listen(PORT, () => console.log(\`🚀 Bridge online at http://localhost:\${PORT}\`));`;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-20">
       <div className="bg-brand-900 rounded-2xl border border-brand-800 p-8 shadow-xl">
         <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
           <KeyRound className="text-brand-500" />
-          Zerodha Connectivity
+          Kite Connectivity
         </h2>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="space-y-6">
-            <div className="bg-yellow-900/10 border border-yellow-900/30 p-4 rounded-xl">
+            <div className="bg-red-900/10 border border-red-900/30 p-4 rounded-xl">
               <div className="flex gap-3">
-                <AlertTriangle className="text-yellow-500 shrink-0" size={20} />
-                <p className="text-xs text-yellow-200">
-                  <strong>Fix "Unreachable" Error:</strong> Ensure your local server uses <code className="text-white">app.use(cors())</code>. If <code className="text-white">localhost</code> fails, use <code className="text-white">http://127.0.0.1:3000</code>.
-                </p>
+                <AlertTriangle className="text-red-500 shrink-0" size={20} />
+                <div className="text-xs text-red-200 space-y-2">
+                  <p><strong>Mixed Content Warning:</strong> Browsers block HTTPS sites (Vercel) from calling HTTP (Localhost).</p>
+                  <p>To fix the "Unreachable" error, use a tunnel like <strong>ngrok</strong> to get a secure HTTPS URL for your bridge:</p>
+                  <code className="bg-black/50 px-2 py-1 rounded text-white block">ngrok http 3000</code>
+                </div>
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-brand-500 mb-2">Bridge Server URL</label>
+              <label className="block text-sm font-medium text-brand-500 mb-2">Bridge Server URL (HTTPS Recommended)</label>
               <div className="relative">
                 <Server className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
                 <input
@@ -94,14 +100,14 @@ app.listen(3000, () => {
                   value={formData.backendUrl}
                   onChange={(e) => handleChange('backendUrl', e.target.value)}
                   className="w-full bg-slate-950 text-white rounded-lg pl-10 pr-4 py-3 border border-brand-800 focus:border-brand-500 font-mono"
-                  placeholder="http://localhost:3000"
+                  placeholder="https://your-tunnel.ngrok-free.app"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2">API Key</label>
+                <label className="block text-sm font-medium text-gray-400 mb-2">Kite API Key</label>
                 <input
                   type="text"
                   value={formData.apiKey}
@@ -110,28 +116,13 @@ app.listen(3000, () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2">Access Token</label>
+                <label className="block text-sm font-medium text-gray-400 mb-2">Kite Access Token</label>
                 <input
                   type="password"
                   value={formData.accessToken}
                   onChange={(e) => handleChange('accessToken', e.target.value)}
                   className="w-full bg-slate-950 text-white rounded-lg px-4 py-3 border border-brand-800 focus:border-brand-500 font-mono text-sm"
                 />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">Trading Passcode (4-6 Digits)</label>
-              <div className="relative">
-                <input
-                  type={showPasscode ? "text" : "password"}
-                  value={formData.passcode}
-                  onChange={(e) => handleChange('passcode', e.target.value)}
-                  className="w-full bg-slate-950 text-white rounded-lg px-4 py-3 border border-brand-800 focus:border-brand-500 tracking-widest font-mono"
-                />
-                <button onClick={() => setShowPasscode(!showPasscode)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">
-                  {showPasscode ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
               </div>
             </div>
 
@@ -162,7 +153,7 @@ app.listen(3000, () => {
               <div className="p-3 bg-brand-800/50 border-b border-brand-800 flex justify-between items-center">
                 <div className="flex items-center gap-2 text-xs font-bold text-gray-300">
                   <Terminal size={14} className="text-brand-500" />
-                  NODE.JS BRIDGE SCRIPT
+                  UPDATED BRIDGE SCRIPT
                 </div>
                 <button 
                   onClick={() => { navigator.clipboard.writeText(nodeCode); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
@@ -178,7 +169,7 @@ app.listen(3000, () => {
               </div>
             </div>
             <p className="text-[10px] text-gray-500 leading-relaxed italic">
-              * Note: You must run this script on your computer for the application to bypass browser CORS restrictions and access Zerodha APIs securely.
+              * Note: Running your bridge via ngrok solves the "Unreachable" error on Vercel deployments.
             </p>
           </div>
         </div>
