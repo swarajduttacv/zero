@@ -4,9 +4,9 @@ import { User, UserSettings } from '../types';
 const USERS_KEY = 'zerogpt_users';
 const CURRENT_USER_KEY = 'zerogpt_current_user_id';
 
-// Fixed missing backendUrl required by UserSettings interface
 const DEFAULT_SETTINGS: UserSettings = {
-  apiKey: '', 
+  geminiApiKey: '',
+  kiteApiKey: '', 
   apiSecret: '',
   accessToken: 'DBBvkRbYPM11MkvMg3jL2HD6Ns2Mc3ha', 
   passcode: '0000',
@@ -41,7 +41,6 @@ export const AuthService = {
         const user = users.find(u => u.id === userId);
         
         if (!user) {
-            // ID exists but user doesn't - cleanup
             this.logout();
             return null;
         }
@@ -62,8 +61,15 @@ export const AuthService = {
         if (!user.settings) {
             user.settings = { ...DEFAULT_SETTINGS };
         } else {
-            // Ensure all default fields exist in user settings
-            user.settings = { ...DEFAULT_SETTINGS, ...user.settings };
+            // Handle legacy "apiKey" mapping if it exists in old data
+            const legacySettings = user.settings as any;
+            
+            user.settings = { 
+                ...DEFAULT_SETTINGS, 
+                ...user.settings,
+                // Migrate legacy generic key to kiteApiKey if kiteApiKey is empty
+                kiteApiKey: user.settings.kiteApiKey || legacySettings.apiKey || '',
+            };
         }
 
         return user;

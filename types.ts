@@ -62,7 +62,8 @@ export interface TradeOrder {
 }
 
 export interface UserSettings {
-  apiKey: string;
+  geminiApiKey: string; // Specific for Google GenAI
+  kiteApiKey: string;   // Specific for Zerodha Kite
   apiSecret: string;
   accessToken: string;
   passcode: string;
