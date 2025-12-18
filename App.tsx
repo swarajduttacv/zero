@@ -243,6 +243,7 @@ const App: React.FC = () => {
                             onTradeRequest={(o) => {setPendingOrder(o); setIsTradeModalOpen(true);}} 
                             messages={currentUser.chatHistory || []}
                             onMessagesChange={handleMessagesChange}
+                            apiKey={currentUser.settings.apiKey}
                         />
                     </div>
                     <div className="bg-brand-900 rounded-2xl border border-brand-800 p-6 h-fit shadow-xl">

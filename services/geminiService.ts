@@ -20,15 +20,17 @@ const proposeTradeTool: FunctionDeclaration = {
 
 export const analyzePortfolio = async (
   portfolio: PortfolioSummary, 
-  userMessage: string
+  userMessage: string,
+  userApiKey?: string
 ): Promise<AIMessageResponse> => {
   
-  // Re-initializing within the function ensures we get the latest process.env.API_KEY
-  const apiKey = process.env.API_KEY;
+  // Priority: 1. Environment Variable (Deployment) 2. User Settings (Runtime Fallback)
+  // We trim to avoid issues with accidental whitespace from copy-pasting
+  const apiKey = (process.env.API_KEY || userApiKey || '').trim();
   
   if (!apiKey) {
     return {
-      analysis: "❌ **API Key Error**: The Gemini API Key is missing. Please ensure you have set the `API_KEY` environment variable in your deployment settings or that you are authenticated properly.",
+      analysis: "❌ **Configuration Error**: No Gemini API Key found.\n\n**How to fix:**\n1. Go to the **Settings** tab in this app.\n2. Paste your Gemini API Key into the 'API Key' field.\n3. Click **Save Configuration**.\n\nAlternatively, ensure `API_KEY` is set in your Vercel environment variables.",
       visuals: { type: 'none', title: '', data: [] }
     };
   }
@@ -81,8 +83,13 @@ export const analyzePortfolio = async (
     };
 
   } catch (error: any) {
+    console.error("Gemini API Error:", error);
+    let errorMsg = error.message;
+    if (errorMsg.includes('403') || errorMsg.includes('API key')) {
+      errorMsg = "Invalid API Key. Please check the key in your Settings tab.";
+    }
     return {
-      analysis: `AI Analysis Error: ${error.message}`,
+      analysis: `⚠️ **AI Error**: ${errorMsg}`,
       visuals: { type: 'none', title: '', data: [] }
     };
   }

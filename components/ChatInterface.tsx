@@ -11,9 +11,10 @@ interface Props {
   onTradeRequest: (order: TradeOrder) => void;
   messages: ChatMessage[];
   onMessagesChange: (messages: ChatMessage[]) => void;
+  apiKey?: string;
 }
 
-export const ChatInterface: React.FC<Props> = ({ portfolio, onTradeRequest, messages, onMessagesChange }) => {
+export const ChatInterface: React.FC<Props> = ({ portfolio, onTradeRequest, messages, onMessagesChange, apiKey }) => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -42,7 +43,8 @@ export const ChatInterface: React.FC<Props> = ({ portfolio, onTradeRequest, mess
     setIsLoading(true);
 
     try {
-      const response = await analyzePortfolio(portfolio, userMsg.content);
+      // Pass the apiKey prop (from user settings) as a fallback
+      const response = await analyzePortfolio(portfolio, userMsg.content, apiKey);
       
       const aiMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -94,6 +96,11 @@ export const ChatInterface: React.FC<Props> = ({ portfolio, onTradeRequest, mess
              <div className="flex flex-col items-center justify-center h-full text-gray-500 space-y-4">
                  <Bot size={48} className="text-brand-800" />
                  <p>Start asking questions about your portfolio...</p>
+                 {!apiKey && !process.env.API_KEY && (
+                   <p className="text-xs text-orange-400 bg-orange-900/20 px-3 py-1 rounded-full border border-orange-900/50">
+                     ⚠️ API Key missing. Please add it in Settings.
+                   </p>
+                 )}
              </div>
         )}
         {messages.map((msg) => (
