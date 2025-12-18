@@ -18,6 +18,7 @@ export interface PortfolioSummary {
   totalPnlPercentage: number;
   cashBalance: number;
   holdings: Stock[];
+  orders?: Transaction[];
 }
 
 export interface ChartDataPoint {
@@ -67,7 +68,16 @@ export interface UserSettings {
   passcode: string;
   isLiveMode: boolean;
   useProxy: boolean;
-  backendUrl: string; // New field for the Node.js bridge
+  backendUrl: string;
+}
+
+export interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'info' | 'success' | 'warning' | 'error';
+  timestamp: Date;
+  read: boolean;
 }
 
 export interface User {
@@ -87,4 +97,5 @@ export interface Transaction {
   quantity: number;
   price: number;
   total: number;
+  status?: string;
 }

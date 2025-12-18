@@ -2,9 +2,6 @@
 import { GoogleGenAI, Type, FunctionDeclaration } from "@google/genai";
 import { PortfolioSummary, AIMessageResponse } from '../types';
 
-// Strict adherence to the mandated initialization pattern
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 const proposeTradeTool: FunctionDeclaration = {
   name: "propose_trade",
   parameters: {
@@ -26,25 +23,28 @@ export const analyzePortfolio = async (
   userMessage: string
 ): Promise<AIMessageResponse> => {
   
-  if (!process.env.API_KEY) {
+  // Re-initializing within the function ensures we get the latest process.env.API_KEY
+  const apiKey = process.env.API_KEY;
+  
+  if (!apiKey) {
     return {
-      analysis: "⚠️ **Environment Error**: `API_KEY` not found in `process.env`. If you are on VerCel, ensure the variable name is exactly `API_KEY` and the project is re-deployed.",
+      analysis: "❌ **API Key Error**: The Gemini API Key is missing. Please ensure you have set the `API_KEY` environment variable in your deployment settings or that you are authenticated properly.",
       visuals: { type: 'none', title: '', data: [] }
     };
   }
 
-  // Use gemini-3-pro-preview for complex financial analysis tasks
+  const ai = new GoogleGenAI({ apiKey });
   const modelId = 'gemini-3-pro-preview';
 
   const systemInstruction = `
-    You are ZeroGPT, an elite financial AI assistant connected to the user's Zerodha profile.
+    You are ZeroGPT, an elite financial AI assistant.
     Current Portfolio: ${JSON.stringify(portfolio, null, 2)}
     
     Guidelines:
-    - Provide deep technical analysis of holdings.
+    - Provide deep technical analysis.
     - If suggesting a trade, ALWAYS use the 'propose_trade' tool.
-    - Use Markdown for formatting.
-    - Be concise but insightful.
+    - Use Markdown.
+    - If asked for reports, summarize their holdings or transaction performance.
   `;
 
   try {
@@ -54,7 +54,7 @@ export const analyzePortfolio = async (
       config: {
         systemInstruction,
         tools: [{ functionDeclarations: [proposeTradeTool] }],
-        temperature: 0.2,
+        temperature: 0.1,
       }
     });
 
@@ -63,7 +63,7 @@ export const analyzePortfolio = async (
       if (call.name === 'propose_trade') {
         const args = call.args as any;
         return {
-          analysis: `I've prepared a **${args.transactionType}** order for **${args.quantity}** shares of **${args.symbol}**. Please review and confirm the execution.`,
+          analysis: `Prepared a **${args.transactionType}** order for **${args.quantity}** shares of **${args.symbol}**.`,
           tradeProposal: {
             symbol: args.symbol,
             transactionType: args.transactionType as 'BUY' | 'SELL',
@@ -76,14 +76,13 @@ export const analyzePortfolio = async (
     }
 
     return { 
-      analysis: response.text || "I've analyzed your data, but couldn't produce a summary. Please try again.",
+      analysis: response.text || "No analysis could be generated.",
       visuals: { type: 'none', title: '', data: [] } 
     };
 
   } catch (error: any) {
-    console.error("ZeroGPT: AI Analysis failed", error);
     return {
-      analysis: `AI Configuration Error: ${error.message}. Please check your environment variables.`,
+      analysis: `AI Analysis Error: ${error.message}`,
       visuals: { type: 'none', title: '', data: [] }
     };
   }

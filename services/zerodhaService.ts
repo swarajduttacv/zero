@@ -1,7 +1,7 @@
 
-import { PortfolioSummary, Stock, TradeOrder, UserSettings } from '../types';
+import { PortfolioSummary, Stock, TradeOrder, UserSettings, Transaction } from '../types';
 
-async function fetchWithTimeout(url: string, options: RequestInit, timeout = 12000): Promise<Response> {
+async function fetchWithTimeout(url: string, options: RequestInit, timeout = 10000): Promise<Response> {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
   try {
@@ -10,7 +10,7 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeout = 120
     return response;
   } catch (error: any) {
     clearTimeout(id);
-    if (error.name === 'AbortError') throw new Error("Bridge Request Timed Out (12s). Check if your local server is under heavy load.");
+    if (error.name === 'AbortError') throw new Error("Connection Timeout. Is your Bridge server running?");
     throw error;
   }
 }
@@ -20,42 +20,39 @@ export const ZerodhaService = {
     if (settings.isLiveMode) {
       if (!settings.backendUrl) throw new Error("Bridge URL is missing. Go to Settings.");
 
-      let url = settings.backendUrl.trim();
-      if (!url.startsWith('http')) url = `http://${url}`;
-      if (url.endsWith('/')) url = url.slice(0, -1);
-
-      // MIXED CONTENT CHECK
-      const isAppSecure = window.location.protocol === 'https:';
-      const isBridgeInsecure = url.startsWith('http:');
-      
-      if (isAppSecure && isBridgeInsecure && !url.includes('localhost') && !url.includes('127.0.0.1')) {
-          throw new Error("SECURE CONNECTION ERROR: Your browser blocks requests from HTTPS (Vercel) to HTTP (Bridge). Please use 'ngrok' to get an HTTPS URL for your bridge, or run this app locally.");
-      }
+      let baseUrl = settings.backendUrl.trim();
+      if (!baseUrl.startsWith('http')) baseUrl = `http://${baseUrl}`;
+      if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
 
       try {
-        console.log(`ZeroGPT: Polling bridge at ${url}/holdings`);
-        
-        const response = await fetchWithTimeout(`${url}/holdings`, {
-          method: 'GET',
-          headers: { 'Accept': 'application/json' },
-          mode: 'cors'
-        }).catch(err => {
-          console.error("Bridge Connection Failed", err);
-          throw new Error(`CONNECTION FAILED: Could not reach ${url}. 1. Ensure your Node.js script is running. 2. Ensure CORS is enabled in the script. 3. Check for firewall blocks.`);
-        });
+        // Parallel fetch for holdings and orders
+        const [holdingsRes, ordersRes] = await Promise.all([
+          fetchWithTimeout(`${baseUrl}/holdings`, { method: 'GET', headers: { 'Accept': 'application/json' }, mode: 'cors' }),
+          fetchWithTimeout(`${baseUrl}/orders`, { method: 'GET', headers: { 'Accept': 'application/json' }, mode: 'cors' }).catch(() => null)
+        ]);
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`BRIDGE REJECTION (${response.status}): ${errorText || 'Check bridge logs.'}`);
+        if (!holdingsRes.ok) {
+          throw new Error(`Bridge Error: ${holdingsRes.status}`);
         }
 
-        const result = await response.json();
+        const hResult = await holdingsRes.json();
+        const holdingsRaw = hResult.data || [];
         
-        if (result.status === 'error' || result.error) {
-          throw new Error(`ZERODHA API ERROR: ${result.message || result.error}`);
+        let orders: Transaction[] = [];
+        if (ordersRes && ordersRes.ok) {
+          const oResult = await ordersRes.json();
+          orders = (oResult.data || []).map((o: any) => ({
+            id: o.order_id,
+            date: o.order_timestamp ? new Date(o.order_timestamp).toLocaleDateString() : new Date().toLocaleDateString(),
+            symbol: o.tradingsymbol,
+            type: o.transaction_type as 'BUY' | 'SELL',
+            quantity: o.quantity,
+            price: o.average_price || o.price,
+            total: (o.average_price || o.price) * o.quantity,
+            status: o.status
+          }));
         }
 
-        const holdingsRaw = result.data || [];
         const holdings: Stock[] = holdingsRaw.map((h: any) => ({
           symbol: h.tradingsymbol,
           name: h.tradingsymbol,
@@ -63,7 +60,7 @@ export const ZerodhaService = {
           averagePrice: h.average_price,
           currentPrice: h.last_price,
           previousClose: h.close_price,
-          sector: 'Equity',
+          sector: h.sector || 'Equity',
         }));
 
         const totalValue = holdings.reduce((acc, s) => acc + (s.currentPrice * s.quantity), 0);
@@ -78,32 +75,32 @@ export const ZerodhaService = {
           totalPnl: totalValue - investedValue,
           totalPnlPercentage: investedValue > 0 ? ((totalValue - investedValue) / investedValue) * 100 : 0,
           cashBalance: 0,
-          holdings
+          holdings,
+          orders
         };
-
       } catch (error: any) {
-        throw new Error(error.message);
+        throw new Error(`Sync Failed: ${error.message}`);
       }
     }
 
-    // Default Mock Data for Simulation
+    // Mock Data for Simulation
     return {
-      totalValue: 1250000,
-      investedValue: 1100000,
-      dayChange: 15400,
-      dayChangePercentage: 1.25,
-      totalPnl: 150000,
-      totalPnlPercentage: 13.6,
-      cashBalance: 45000,
-      holdings: []
+      totalValue: 842000,
+      investedValue: 710000,
+      dayChange: 12400,
+      dayChangePercentage: 1.49,
+      totalPnl: 132000,
+      totalPnlPercentage: 18.59,
+      cashBalance: 52000,
+      holdings: [],
+      orders: []
     };
   },
 
   async executeTrade(order: TradeOrder, settings: UserSettings, passcode: string): Promise<boolean> {
-    if (passcode !== settings.passcode) throw new Error("Verification Failed: Invalid Passcode.");
+    if (passcode !== settings.passcode) throw new Error("Invalid Passcode.");
     
     if (!settings.isLiveMode) {
-      await new Promise(r => setTimeout(r, 1000));
       return true;
     }
 
@@ -111,20 +108,27 @@ export const ZerodhaService = {
     if (!url.startsWith('http')) url = `http://${url}`;
     if (url.endsWith('/')) url = url.slice(0, -1);
 
-    try {
-      const response = await fetch(`${url}/order`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(order)
-      });
+    const response = await fetch(`${url}/order`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(order)
+    });
 
-      if (!response.ok) throw new Error("Order was rejected by the local bridge server.");
-      const result = await response.json();
-      if (result.status === 'error' || result.error) throw new Error(result.message || result.error);
-      
-      return true;
-    } catch (error: any) {
-      throw new Error(`Trade Execution Failure: ${error.message}`);
-    }
+    if (!response.ok) throw new Error("Bridge rejected the order.");
+    return true;
   }
+};
+
+export const exportToCSV = (data: any[], filename: string) => {
+  if (!data.length) return;
+  const headers = Object.keys(data[0]).join(',');
+  const rows = data.map(obj => Object.values(obj).join(',')).join('\n');
+  const csvContent = "data:text/csv;charset=utf-8," + headers + "\n" + rows;
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 };
