@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { UserSettings } from '../types';
-import { Save, Server, Terminal, Copy, Check, AlertTriangle, KeyRound, Sparkles, Link as LinkIcon } from 'lucide-react';
+import { Save, Server, Terminal, Copy, Check, AlertTriangle, KeyRound, Sparkles, Link as LinkIcon, ShieldCheck } from 'lucide-react';
 
 interface Props {
   settings: UserSettings;
@@ -151,14 +151,6 @@ app.listen(3000, () => console.log('🚀 Bridge running on http://localhost:3000
               />
               <label htmlFor="liveMode" className="text-sm text-gray-300 font-medium select-none cursor-pointer">Enable Live Connection</label>
             </div>
-
-            <button
-              onClick={() => onSave(formData)}
-              className="w-full bg-brand-500 hover:bg-brand-600 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-brand-500/20 flex items-center justify-center gap-2"
-            >
-              <Save size={20} />
-              Save Configuration
-            </button>
           </div>
 
           <div className="bg-slate-950 rounded-xl border border-brand-800 overflow-hidden flex flex-col h-[500px]">
@@ -172,6 +164,36 @@ app.listen(3000, () => console.log('🚀 Bridge running on http://localhost:3000
               <pre>{nodeCode}</pre>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* SECTION 3: SECURITY CONFIGURATION */}
+      <div className="bg-brand-900 rounded-2xl border border-brand-800 p-8 shadow-xl">
+        <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-3">
+          <ShieldCheck className="text-brand-500" />
+          Security
+        </h2>
+        <div className="space-y-4">
+             <div>
+              <label className="block text-sm font-medium text-brand-500 mb-2">Transaction Passcode</label>
+              <input
+                type="password"
+                maxLength={6}
+                value={formData.passcode}
+                onChange={(e) => handleChange('passcode', e.target.value)}
+                className="w-full max-w-xs bg-slate-950 text-white rounded-lg px-4 py-3 border border-brand-800 font-mono tracking-widest text-center text-lg focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all"
+                placeholder="0000"
+              />
+              <p className="text-xs text-gray-500 mt-2">This 4-6 digit code is required to authorize any trade execution via the Chat Assistant.</p>
+            </div>
+            
+            <button
+              onClick={() => onSave(formData)}
+              className="w-full md:w-auto px-8 bg-brand-500 hover:bg-brand-600 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-brand-500/20 flex items-center justify-center gap-2"
+            >
+              <Save size={20} />
+              Save Configuration
+            </button>
         </div>
       </div>
     </div>

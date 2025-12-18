@@ -84,8 +84,8 @@ const App: React.FC = () => {
       // Initial fetch
       syncPortfolio(currentUser);
       
-      // Polling setup - depends only on currentUser stability
-      const intervalId = setInterval(() => syncPortfolio(currentUser), 30000);
+      // Polling setup - Reduced to 5 seconds for "Live" feel
+      const intervalId = setInterval(() => syncPortfolio(currentUser), 5000); 
       return () => clearInterval(intervalId);
     }
   }, [currentUser, syncPortfolio]);
@@ -130,9 +130,16 @@ const App: React.FC = () => {
       setIsTradeModalOpen(false);
       setPendingOrder(null);
       addNotification("Order Executed", `${pendingOrder.transactionType} ${pendingOrder.quantity} ${pendingOrder.symbol} completed.`, "success");
-      syncPortfolio(currentUser);
+      
+      // Immediate sync after trade to update reports
+      setTimeout(() => syncPortfolio(currentUser), 1000);
+      
     } catch (error: any) {
        addNotification("Trade Failed", error.message, "error");
+       // Keep modal open on wrong passcode
+       if (error.message !== 'Invalid Passcode.') {
+         setIsTradeModalOpen(false); 
+       }
        throw error;
     }
   };

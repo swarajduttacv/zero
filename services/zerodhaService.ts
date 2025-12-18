@@ -26,6 +26,7 @@ export const ZerodhaService = {
 
       try {
         // Parallel fetch for holdings and orders
+        // Note: '/orders' typically returns the order book for the current day
         const [holdingsRes, ordersRes] = await Promise.all([
           fetchWithTimeout(`${baseUrl}/holdings`, { method: 'GET', headers: { 'Accept': 'application/json' }, mode: 'cors' }),
           fetchWithTimeout(`${baseUrl}/orders`, { method: 'GET', headers: { 'Accept': 'application/json' }, mode: 'cors' }).catch(() => null)
@@ -41,9 +42,13 @@ export const ZerodhaService = {
         let orders: Transaction[] = [];
         if (ordersRes && ordersRes.ok) {
           const oResult = await ordersRes.json();
-          orders = (oResult.data || []).map((o: any) => ({
+          const rawOrders = oResult.data || [];
+          
+          orders = rawOrders.map((o: any) => ({
             id: o.order_id,
-            date: o.order_timestamp ? new Date(o.order_timestamp).toLocaleDateString() : new Date().toLocaleDateString(),
+            // Use order_timestamp if available, otherwise fallback
+            date: o.order_timestamp ? new Date(o.order_timestamp).toLocaleTimeString() + ' ' + new Date(o.order_timestamp).toLocaleDateString() : new Date().toLocaleDateString(),
+            rawDate: o.order_timestamp ? new Date(o.order_timestamp) : new Date(),
             symbol: o.tradingsymbol,
             type: o.transaction_type as 'BUY' | 'SELL',
             quantity: o.quantity,
@@ -51,6 +56,9 @@ export const ZerodhaService = {
             total: (o.average_price || o.price) * o.quantity,
             status: o.status
           }));
+
+          // Sort orders: Newest first
+          orders.sort((a: any, b: any) => b.rawDate.getTime() - a.rawDate.getTime());
         }
 
         const holdings: Stock[] = holdingsRaw.map((h: any) => ({
@@ -115,7 +123,10 @@ export const ZerodhaService = {
   },
 
   async executeTrade(order: TradeOrder, settings: UserSettings, passcode: string): Promise<boolean> {
-    if (passcode !== settings.passcode) throw new Error("Invalid Passcode.");
+    // Strict passcode validation
+    if (!settings.passcode || passcode !== settings.passcode) {
+        throw new Error("Invalid Passcode.");
+    }
     
     if (!settings.isLiveMode) {
       // Simulate network delay in mock mode
