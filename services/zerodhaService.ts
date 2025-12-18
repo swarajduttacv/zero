@@ -25,11 +25,11 @@ export const ZerodhaService = {
       if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
 
       try {
-        // Parallel fetch for holdings and orders
-        // Note: '/orders' typically returns the order book for the current day
-        const [holdingsRes, ordersRes] = await Promise.all([
-          fetchWithTimeout(`${baseUrl}/holdings`, { method: 'GET', headers: { 'Accept': 'application/json' }, mode: 'cors' }),
-          fetchWithTimeout(`${baseUrl}/orders`, { method: 'GET', headers: { 'Accept': 'application/json' }, mode: 'cors' }).catch(() => null)
+        // Parallel fetch for holdings, orders, and margins (funds)
+        const [holdingsRes, ordersRes, marginsRes] = await Promise.all([
+          fetchWithTimeout(`${baseUrl}/holdings`, { method: 'GET', headers: { 'Accept': 'application/json' } }),
+          fetchWithTimeout(`${baseUrl}/orders`, { method: 'GET', headers: { 'Accept': 'application/json' } }).catch(() => null),
+          fetchWithTimeout(`${baseUrl}/margins`, { method: 'GET', headers: { 'Accept': 'application/json' } }).catch(() => null)
         ]);
 
         if (!holdingsRes.ok) {
@@ -39,6 +39,14 @@ export const ZerodhaService = {
         const hResult = await holdingsRes.json();
         const holdingsRaw = hResult.data || [];
         
+        // Parse Cash Balance
+        let cashBalance = 0;
+        if (marginsRes && marginsRes.ok) {
+            const mResult = await marginsRes.json();
+            // Typically equity.net or equity.available.cash
+            cashBalance = mResult.data?.equity?.net || 0;
+        }
+
         let orders: Transaction[] = [];
         if (ordersRes && ordersRes.ok) {
           const oResult = await ordersRes.json();
@@ -46,7 +54,6 @@ export const ZerodhaService = {
           
           orders = rawOrders.map((o: any) => ({
             id: o.order_id,
-            // Use order_timestamp if available, otherwise fallback
             date: o.order_timestamp ? new Date(o.order_timestamp).toLocaleTimeString() + ' ' + new Date(o.order_timestamp).toLocaleDateString() : new Date().toLocaleDateString(),
             rawDate: o.order_timestamp ? new Date(o.order_timestamp) : new Date(),
             symbol: o.tradingsymbol,
@@ -56,8 +63,6 @@ export const ZerodhaService = {
             total: (o.average_price || o.price) * o.quantity,
             status: o.status
           }));
-
-          // Sort orders: Newest first
           orders.sort((a: any, b: any) => b.rawDate.getTime() - a.rawDate.getTime());
         }
 
@@ -82,7 +87,7 @@ export const ZerodhaService = {
           dayChangePercentage: totalValue > 0 ? (dayChange / (totalValue - dayChange)) * 100 : 0,
           totalPnl: totalValue - investedValue,
           totalPnlPercentage: investedValue > 0 ? ((totalValue - investedValue) / investedValue) * 100 : 0,
-          cashBalance: 0,
+          cashBalance: cashBalance,
           holdings,
           orders
         };
@@ -91,7 +96,7 @@ export const ZerodhaService = {
       }
     }
 
-    // Mock Data for Simulation (Consistent with previous total values)
+    // Mock Data for Simulation
     const mockHoldings: Stock[] = [
       { symbol: 'RELIANCE', name: 'Reliance Industries', quantity: 150, averagePrice: 2350.00, currentPrice: 2475.20, previousClose: 2460, sector: 'Energy' },
       { symbol: 'TCS', name: 'Tata Consultancy Svc', quantity: 45, averagePrice: 3200.00, currentPrice: 3540.00, previousClose: 3500, sector: 'IT' },
@@ -101,7 +106,6 @@ export const ZerodhaService = {
       { symbol: 'ZOMATO', name: 'Zomato Ltd', quantity: 1000, averagePrice: 65.00, currentPrice: 92.00, previousClose: 90, sector: 'Tech' },
     ];
     
-    // Calculate exact totals from mock holdings
     const totalValue = mockHoldings.reduce((acc, s) => acc + (s.currentPrice * s.quantity), 0);
     const investedValue = mockHoldings.reduce((acc, s) => acc + (s.averagePrice * s.quantity), 0);
     const dayChange = mockHoldings.reduce((acc, s) => acc + ((s.currentPrice - s.previousClose) * s.quantity), 0);
@@ -122,14 +126,40 @@ export const ZerodhaService = {
     };
   },
 
+  async getLTP(symbol: string, settings: UserSettings): Promise<number | null> {
+    if (!settings.isLiveMode || !settings.backendUrl) return null;
+
+    let baseUrl = settings.backendUrl.trim();
+    if (!baseUrl.startsWith('http')) baseUrl = `http://${baseUrl}`;
+    if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
+
+    try {
+        // Default to NSE if no exchange provided
+        const querySymbol = symbol.includes(':') ? symbol : `NSE:${symbol}`;
+        const response = await fetch(`${baseUrl}/quote?symbol=${querySymbol}`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        });
+        
+        if (!response.ok) return null;
+        
+        const json = await response.json();
+        // Structure: { status: 'success', data: { 'NSE:INFY': { last_price: 1234 } } }
+        const data = json.data || {};
+        const instrument = data[querySymbol];
+        return instrument ? instrument.last_price : null;
+    } catch (e) {
+        console.error("LTP Fetch Failed:", e);
+        return null;
+    }
+  },
+
   async executeTrade(order: TradeOrder, settings: UserSettings, passcode: string): Promise<boolean> {
-    // Strict passcode validation
     if (!settings.passcode || passcode !== settings.passcode) {
         throw new Error("Invalid Passcode.");
     }
     
     if (!settings.isLiveMode) {
-      // Simulate network delay in mock mode
       await new Promise(resolve => setTimeout(resolve, 1000));
       return true;
     }

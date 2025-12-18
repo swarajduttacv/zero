@@ -50,9 +50,24 @@ app.get('/orders', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+app.get('/margins', async (req, res) => {
+  try {
+    const r = await fetch("https://api.kite.trade/user/margins", { headers: HEADERS });
+    res.json(await r.json());
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/quote', async (req, res) => {
+  try {
+    // Expects query param ?symbol=NSE:INFY
+    const symbol = req.query.symbol; 
+    const r = await fetch(\`https://api.kite.trade/quote/ltp?i=\${symbol}\`, { headers: HEADERS });
+    res.json(await r.json());
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/order', async (req, res) => {
   try {
-    // Basic Order Execution Proxy
     const response = await fetch("https://api.kite.trade/orders/" + (req.body.variety || 'regular'), {
         method: 'POST',
         headers: { ...HEADERS, 'Content-Type': 'application/x-www-form-urlencoded' },

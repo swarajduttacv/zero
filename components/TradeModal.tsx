@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { TradeOrder } from '../types';
 import { X, Lock, AlertTriangle, CheckCircle, Wallet } from 'lucide-react';
@@ -73,12 +74,20 @@ export const TradeModal: React.FC<Props> = ({ order, onConfirm, onCancel, isOpen
                  </div>
                  <div className="w-px bg-brand-800/50"></div>
                  <div className="text-center">
-                     <div className="text-[10px] text-gray-500 uppercase font-bold">Est. Price</div>
-                     <div className="text-sm text-gray-300 font-mono">
-                        {order.price ? `₹${order.price}` : 'MARKET'}
+                     <div className="text-[10px] text-gray-500 uppercase font-bold">Price / Share</div>
+                     <div className="text-lg text-white font-bold font-mono">
+                        {order.price ? `₹${order.price.toLocaleString('en-IN')}` : 'MARKET'}
                      </div>
+                     {!order.price && <div className="text-[9px] text-gray-600">Price determined at execution</div>}
                  </div>
              </div>
+             
+             {estimatedTotal > 0 && (
+                <div className="mt-4 pt-3 border-t border-brand-800/30 w-full text-center">
+                    <div className="text-[10px] text-gray-500 uppercase font-bold">Estimated Total</div>
+                    <div className="text-xl font-bold text-white font-mono">₹{estimatedTotal.toLocaleString('en-IN')}</div>
+                </div>
+             )}
           </div>
 
           <div className="space-y-3">

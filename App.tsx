@@ -11,6 +11,7 @@ import { AnalyticsView } from './components/AnalyticsView';
 import { ReportsView } from './components/ReportsView';
 import { AuthScreen } from './components/AuthScreen';
 import { AuthService } from './services/authService';
+import { Toast } from './components/Toast';
 import { Bell, AlertCircle, ShieldCheck, X } from 'lucide-react';
 import { PortfolioSummary, TradeOrder, UserSettings, User, ChatMessage, Notification } from './types';
 
@@ -22,11 +23,11 @@ const App: React.FC = () => {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [currentToast, setCurrentToast] = useState<Notification | null>(null);
   
   const [pendingOrder, setPendingOrder] = useState<TradeOrder | null>(null);
   const [isTradeModalOpen, setIsTradeModalOpen] = useState(false);
 
-  // Use a ref for the error state to avoid re-triggering effects during sync logic
   const errorRef = useRef<string | null>(null);
 
   const addNotification = useCallback((title: string, message: string, type: Notification['type'] = 'info') => {
@@ -39,6 +40,12 @@ const App: React.FC = () => {
       read: false
     };
     setNotifications(prev => [newNote, ...prev].slice(0, 10));
+    setCurrentToast(newNote);
+  }, []);
+
+  // Stable handler for closing toasts
+  const handleCloseToast = useCallback(() => {
+    setCurrentToast(null);
   }, []);
 
   useEffect(() => {
@@ -52,13 +59,11 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Decoupled fetching logic to prevent infinite render loops
   const syncPortfolio = useCallback(async (user: User) => {
     try {
       const data = await ZerodhaService.getPortfolio(user.settings);
       setPortfolio(data);
       
-      // Notify only if we just recovered from an error
       if (errorRef.current) {
         addNotification("System Connected", "Portfolio successfully synced with Kite.", "success");
         errorRef.current = null;
@@ -66,13 +71,10 @@ const App: React.FC = () => {
       }
     } catch (error: any) {
       const msg = error.message;
-      // Only update state if the error message actually changed to avoid unnecessary re-renders
       if (errorRef.current !== msg) {
         errorRef.current = msg;
         setFetchError(msg);
       }
-      
-      // Provide a minimal valid state if none exists to keep UI alive
       setPortfolio(prev => prev || {
         totalValue: 0, investedValue: 0, dayChange: 0, dayChangePercentage: 0, totalPnl: 0, totalPnlPercentage: 0, cashBalance: 0, holdings: [], orders: []
       });
@@ -81,10 +83,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (currentUser) {
-      // Initial fetch
       syncPortfolio(currentUser);
-      
-      // Polling setup - Reduced to 5 seconds for "Live" feel
       const intervalId = setInterval(() => syncPortfolio(currentUser), 5000); 
       return () => clearInterval(intervalId);
     }
@@ -107,10 +106,9 @@ const App: React.FC = () => {
   const handleSettingsSave = (newSettings: UserSettings) => {
     if (currentUser) {
       const updatedUser = { ...currentUser, settings: newSettings };
-      setCurrentUser(updatedUser); // Update state
-      AuthService.updateUser(updatedUser); // Update storage
+      setCurrentUser(updatedUser); 
+      AuthService.updateUser(updatedUser); 
       addNotification("Settings Updated", "Configuration saved successfully.");
-      // Trigger immediate re-sync with new settings
       syncPortfolio(updatedUser);
     }
   };
@@ -118,9 +116,38 @@ const App: React.FC = () => {
   const handleMessagesChange = (newMessages: ChatMessage[]) => {
     if (currentUser) {
       const updatedUser = { ...currentUser, chatHistory: newMessages };
-      setCurrentUser(updatedUser); // Update state immediately
-      AuthService.updateUser(updatedUser); // Persist to storage
+      setCurrentUser(updatedUser); 
+      AuthService.updateUser(updatedUser); 
     }
+  };
+
+  const handleTradeRequest = async (order: TradeOrder) => {
+    if (!currentUser) return;
+    
+    // Create a copy so we can modify it
+    const enhancedOrder = { ...order };
+
+    // If Price is missing (Market Order) -> Fetch LTP
+    if (!enhancedOrder.price) {
+        // 1. Try Live Fetch if mode is enabled
+        if (currentUser.settings.isLiveMode) {
+             try {
+                 const ltp = await ZerodhaService.getLTP(enhancedOrder.symbol, currentUser.settings);
+                 if (ltp) enhancedOrder.price = ltp;
+             } catch (e) {
+                 console.warn("LTP fetch failed", e);
+             }
+        }
+        
+        // 2. Fallback to Portfolio Holdings if still missing
+        if (!enhancedOrder.price && portfolio) {
+            const holding = portfolio.holdings.find(h => h.symbol === enhancedOrder.symbol);
+            if (holding) enhancedOrder.price = holding.currentPrice;
+        }
+    }
+
+    setPendingOrder(enhancedOrder);
+    setIsTradeModalOpen(true);
   };
 
   const confirmTrade = async (passcode: string) => {
@@ -129,14 +156,10 @@ const App: React.FC = () => {
       await ZerodhaService.executeTrade(pendingOrder, currentUser.settings, passcode);
       setIsTradeModalOpen(false);
       setPendingOrder(null);
-      addNotification("Order Executed", `${pendingOrder.transactionType} ${pendingOrder.quantity} ${pendingOrder.symbol} completed.`, "success");
-      
-      // Immediate sync after trade to update reports
+      addNotification("Order Executed", `Successfully ${pendingOrder.transactionType === 'BUY' ? 'bought' : 'sold'} ${pendingOrder.quantity} ${pendingOrder.symbol}.`, "success");
       setTimeout(() => syncPortfolio(currentUser), 1000);
-      
     } catch (error: any) {
        addNotification("Trade Failed", error.message, "error");
-       // Keep modal open on wrong passcode
        if (error.message !== 'Invalid Passcode.') {
          setIsTradeModalOpen(false); 
        }
@@ -247,7 +270,7 @@ const App: React.FC = () => {
                     <div className="lg:col-span-2 h-[600px]">
                         <ChatInterface 
                             portfolio={portfolio} 
-                            onTradeRequest={(o) => {setPendingOrder(o); setIsTradeModalOpen(true);}} 
+                            onTradeRequest={handleTradeRequest} 
                             messages={currentUser.chatHistory || []}
                             onMessagesChange={handleMessagesChange}
                             apiKey={currentUser.settings.geminiApiKey}
@@ -301,6 +324,9 @@ const App: React.FC = () => {
           {activeTab === 'Settings' && <SettingsView settings={currentUser.settings} onSave={handleSettingsSave} />}
         </div>
       </main>
+
+      {/* Global Toast Notification */}
+      <Toast notification={currentToast} onClose={handleCloseToast} />
 
       {pendingOrder && (
           <TradeModal 
