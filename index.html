@@ -29,6 +29,15 @@
               profit: '#10b981',
               loss: '#ef4444',
             },
+            animation: {
+              'fade-in': 'fadeIn 0.5s ease-out forwards',
+            },
+            keyframes: {
+              fadeIn: {
+                '0%': { opacity: '0', transform: 'translateY(10px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              }
+            }
           },
         },
       };
@@ -42,13 +51,22 @@
         overflow: hidden;
       }
       
-      /* CRITICAL: Bulletproof visibility for all text inputs */
+      /* CRITICAL: Fix for Chrome/Edge Autofill White Background */
+      input:-webkit-autofill,
+      input:-webkit-autofill:hover, 
+      input:-webkit-autofill:focus, 
+      input:-webkit-autofill:active{
+          -webkit-box-shadow: 0 0 0 30px #020617 inset !important;
+          -webkit-text-fill-color: white !important;
+          transition: background-color 5000s ease-in-out 0s;
+      }
+
+      /* Global Input Styling */
       input, textarea, select {
         color: #ffffff !important;
         background-color: #020617 !important;
         border: 1px solid #334155 !important;
         font-family: inherit;
-        -webkit-text-fill-color: #ffffff !important; /* Fix for some autofill overrides */
       }
       
       input:focus, textarea:focus {
@@ -57,8 +75,10 @@
         box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3) !important;
       }
 
-      input::placeholder {
+      /* Distinct Placeholder Color */
+      input::placeholder, textarea::placeholder {
         color: #64748b !important;
+        opacity: 1;
       }
 
       #root:empty {
@@ -80,6 +100,22 @@
         animation: spin 1s linear infinite;
       }
       @keyframes spin { to { transform: rotate(360deg); } }
+      
+      /* Scrollbar Styling */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #0f172a; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #334155; 
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #475569; 
+      }
     </style>
     <script type="importmap">
     {

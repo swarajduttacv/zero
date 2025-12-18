@@ -48,7 +48,7 @@ export const AuthScreen: React.FC<Props> = ({ onLogin }) => {
         <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-brand-accent/10 blur-[100px]"></div>
       </div>
 
-      <div className="bg-brand-900 w-full max-w-md rounded-3xl border border-brand-800 shadow-2xl p-8 relative z-10">
+      <div className="bg-brand-900 w-full max-w-md rounded-3xl border border-brand-800 shadow-2xl p-8 relative z-10 animate-fade-in">
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-gradient-to-tr from-brand-500 to-brand-accent rounded-2xl mx-auto flex items-center justify-center mb-4 shadow-lg shadow-brand-500/20">
             <span className="text-3xl font-bold text-white">Z</span>
@@ -69,7 +69,7 @@ export const AuthScreen: React.FC<Props> = ({ onLogin }) => {
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-brand-950 text-white rounded-xl pl-10 pr-4 py-3 border border-brand-800 focus:border-brand-500 focus:outline-none transition-colors"
+                  className="w-full bg-brand-950 text-white rounded-xl pl-10 pr-4 py-3 border border-brand-800 focus:border-brand-500 focus:outline-none transition-colors placeholder-gray-500"
                   placeholder="John Doe"
                 />
               </div>
@@ -85,7 +85,7 @@ export const AuthScreen: React.FC<Props> = ({ onLogin }) => {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-brand-950 text-white rounded-xl pl-10 pr-4 py-3 border border-brand-800 focus:border-brand-500 focus:outline-none transition-colors"
+                className="w-full bg-brand-950 text-white rounded-xl pl-10 pr-4 py-3 border border-brand-800 focus:border-brand-500 focus:outline-none transition-colors placeholder-gray-500"
                 placeholder="john@example.com"
               />
             </div>
@@ -100,17 +100,17 @@ export const AuthScreen: React.FC<Props> = ({ onLogin }) => {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-brand-950 text-white rounded-xl pl-10 pr-4 py-3 border border-brand-800 focus:border-brand-500 focus:outline-none transition-colors"
+                className="w-full bg-brand-950 text-white rounded-xl pl-10 pr-4 py-3 border border-brand-800 focus:border-brand-500 focus:outline-none transition-colors placeholder-gray-500"
                 placeholder="••••••••"
               />
             </div>
           </div>
 
-          {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+          {error && <p className="text-red-500 text-sm text-center font-medium bg-red-900/10 p-2 rounded-lg border border-red-900/20">{error}</p>}
 
           <button
             type="submit"
-            className="w-full bg-brand-500 hover:bg-brand-600 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-brand-500/20 flex items-center justify-center gap-2 mt-2"
+            className="w-full bg-brand-500 hover:bg-brand-600 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-brand-500/20 flex items-center justify-center gap-2 mt-4"
           >
             {isLogin ? 'Sign In' : 'Create Account'}
             <ArrowRight size={18} />

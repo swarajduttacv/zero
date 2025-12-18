@@ -107,8 +107,8 @@ const App: React.FC = () => {
   const handleSettingsSave = (newSettings: UserSettings) => {
     if (currentUser) {
       const updatedUser = { ...currentUser, settings: newSettings };
-      setCurrentUser(updatedUser);
-      AuthService.updateUser(updatedUser);
+      setCurrentUser(updatedUser); // Update state
+      AuthService.updateUser(updatedUser); // Update storage
       addNotification("Settings Updated", "Configuration saved successfully.");
       // Trigger immediate re-sync with new settings
       syncPortfolio(updatedUser);
@@ -117,7 +117,9 @@ const App: React.FC = () => {
 
   const handleMessagesChange = (newMessages: ChatMessage[]) => {
     if (currentUser) {
-      AuthService.updateUser({ ...currentUser, chatHistory: newMessages });
+      const updatedUser = { ...currentUser, chatHistory: newMessages };
+      setCurrentUser(updatedUser); // Update state immediately
+      AuthService.updateUser(updatedUser); // Persist to storage
     }
   };
 
@@ -224,8 +226,8 @@ const App: React.FC = () => {
           <div className="mb-6 p-4 bg-red-900/10 border border-red-900/30 rounded-xl flex items-start gap-3 animate-in slide-in-from-top duration-300">
               <AlertCircle className="text-red-500 shrink-0 mt-0.5" />
               <div className="flex-1">
-                  <h3 className="text-red-500 font-bold text-sm">Sync Error</h3>
-                  <p className="text-red-200/70 text-sm mt-1">{fetchError}</p>
+                  <h3 className="text-red-500 font-bold text-sm">Sync Status</h3>
+                  <p className="text-red-200/70 text-sm mt-1">{fetchError} Running in Simulation Mode.</p>
               </div>
           </div>
         )}
@@ -285,7 +287,7 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {activeTab === 'Holdings' && portfolio && <HoldingsView portfolio={portfolio} />}
+          {activeTab === 'Holdings' && portfolio && <HoldingsView portfolio={portfolio} onSwitchToDashboard={() => setActiveTab('Dashboard')} onRequestAnalysis={(msg) => handleMessagesChange([...(currentUser.chatHistory || []), {id: Date.now().toString(), role: 'user', content: msg, timestamp: new Date()}])} />}
           {activeTab === 'Analytics' && portfolio && <AnalyticsView portfolio={portfolio} />}
           {activeTab === 'Reports' && <ReportsView portfolio={portfolio} />}
           {activeTab === 'Settings' && <SettingsView settings={currentUser.settings} onSave={handleSettingsSave} />}

@@ -83,17 +83,34 @@ export const ZerodhaService = {
       }
     }
 
-    // Mock Data for Simulation
+    // Mock Data for Simulation (Consistent with previous total values)
+    const mockHoldings: Stock[] = [
+      { symbol: 'RELIANCE', name: 'Reliance Industries', quantity: 150, averagePrice: 2350.00, currentPrice: 2475.20, previousClose: 2460, sector: 'Energy' },
+      { symbol: 'TCS', name: 'Tata Consultancy Svc', quantity: 45, averagePrice: 3200.00, currentPrice: 3540.00, previousClose: 3500, sector: 'IT' },
+      { symbol: 'INFY', name: 'Infosys', quantity: 120, averagePrice: 1450.00, currentPrice: 1380.00, previousClose: 1390, sector: 'IT' },
+      { symbol: 'HDFCBANK', name: 'HDFC Bank', quantity: 200, averagePrice: 1480.00, currentPrice: 1610.50, previousClose: 1600, sector: 'Finance' },
+      { symbol: 'TATAMOTORS', name: 'Tata Motors', quantity: 300, averagePrice: 420.00, currentPrice: 620.00, previousClose: 610, sector: 'Auto' },
+      { symbol: 'ZOMATO', name: 'Zomato Ltd', quantity: 1000, averagePrice: 65.00, currentPrice: 92.00, previousClose: 90, sector: 'Tech' },
+    ];
+    
+    // Calculate exact totals from mock holdings
+    const totalValue = mockHoldings.reduce((acc, s) => acc + (s.currentPrice * s.quantity), 0);
+    const investedValue = mockHoldings.reduce((acc, s) => acc + (s.averagePrice * s.quantity), 0);
+    const dayChange = mockHoldings.reduce((acc, s) => acc + ((s.currentPrice - s.previousClose) * s.quantity), 0);
+    
     return {
-      totalValue: 842000,
-      investedValue: 710000,
-      dayChange: 12400,
-      dayChangePercentage: 1.49,
-      totalPnl: 132000,
-      totalPnlPercentage: 18.59,
+      totalValue,
+      investedValue,
+      dayChange,
+      dayChangePercentage: (dayChange / (totalValue - dayChange)) * 100,
+      totalPnl: totalValue - investedValue,
+      totalPnlPercentage: ((totalValue - investedValue) / investedValue) * 100,
       cashBalance: 52000,
-      holdings: [],
-      orders: []
+      holdings: mockHoldings,
+      orders: [
+         { id: '10001', date: new Date().toLocaleDateString(), symbol: 'RELIANCE', type: 'BUY', quantity: 10, price: 2450, total: 24500, status: 'COMPLETE' },
+         { id: '10002', date: new Date(Date.now() - 86400000).toLocaleDateString(), symbol: 'TCS', type: 'SELL', quantity: 5, price: 3500, total: 17500, status: 'COMPLETE' }
+      ]
     };
   },
 
@@ -101,6 +118,8 @@ export const ZerodhaService = {
     if (passcode !== settings.passcode) throw new Error("Invalid Passcode.");
     
     if (!settings.isLiveMode) {
+      // Simulate network delay in mock mode
+      await new Promise(resolve => setTimeout(resolve, 1000));
       return true;
     }
 
@@ -120,7 +139,10 @@ export const ZerodhaService = {
 };
 
 export const exportToCSV = (data: any[], filename: string) => {
-  if (!data.length) return;
+  if (!data || !data.length) {
+    alert("No data available to export.");
+    return;
+  }
   const headers = Object.keys(data[0]).join(',');
   const rows = data.map(obj => Object.values(obj).join(',')).join('\n');
   const csvContent = "data:text/csv;charset=utf-8," + headers + "\n" + rows;
