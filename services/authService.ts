@@ -8,7 +8,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   geminiApiKey: '',
   kiteApiKey: '', 
   apiSecret: '',
-  accessToken: 'DBBvkRbYPM11MkvMg3jL2HD6Ns2Mc3ha', 
+  accessToken: 'DBBvkRbYPM11MkvMg3jL2HD6Ns2Mc3gh', 
   passcode: '0000',
   isLiveMode: false,
   useProxy: true,
