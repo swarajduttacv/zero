@@ -1,5 +1,5 @@
 <div align="center">
-<img width="1200" height="400" alt="zerogpt banner" src="./assets/banner.png" />
+<img width="1200" height="400" alt="zerogpt banner" src="./assets/assets/banner_zero_17809874295571.png" />
 
 # zerogpt
 
